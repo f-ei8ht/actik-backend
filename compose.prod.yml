@@ -1,16 +1,56 @@
 name: actik
 
 services:
+  hydradb:
+    image: ghcr.io/hydra-db/hydradb:latest
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      CLOUD_PROVIDER: local
+      LOCAL_PATH: /data/store
+      GRAPH_NAMESPACE: ${HYDRADB_NAMESPACE:-default}
+      GRAPH_ID: ${HYDRADB_GRAPH_ID:-default}
+      GRAPH_DATABASE: ${HYDRADB_GRAPH_ID:-default}
+      GRAPH_CELL_ID: ${HYDRADB_CELL_ID:-cell-0}
+      GRAPH_CELLS: ${HYDRADB_CELL_ID:-cell-0}
+      GRAPH_NODE_ID: node-0
+      GRAPH_ADVERTISED_BOLT_ADDR: 127.0.0.1:7687
+      GRAPH_BOLT_NODE_ADDRESSES: node-0=127.0.0.1:7687
+      GRAPH_DATA_CACHE_DIR: /data/cache
+      GRAPH_AUTH_TOKEN_FILE: /data/auth-token
+      GRAPH_ALLOW_PLAINTEXT: "true"
+      RUST_MIN_STACK: "33554432"
+      HYDRADB_AUTH_TOKEN: ${HYDRADB_AUTH_TOKEN:?set HYDRADB_AUTH_TOKEN (>= 32 chars) in backend/.env}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        mkdir -p /data/store /data/cache &&
+        printf '%s\n' "$HYDRADB_AUTH_TOKEN" > /data/auth-token &&
+        chown -R 10001:10001 /data &&
+        exec setpriv --reuid=10001 --regid=10001 --clear-groups graph-node
+    volumes:
+      - ./hydradb-data:/data
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9090 && printf 'GET /readyz HTTP/1.0\\r\\nHost: 127.0.0.1\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
   api:
     build:
       context: .
       dockerfile: prod.Dockerfile
     restart: unless-stopped
+    depends_on:
+      hydradb:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-}
-      HYDRADB_HTTP_URL: ${HYDRADB_HTTP_URL:-http://127.0.0.1:8443}
-      HYDRADB_AUTH_TOKEN: ${HYDRADB_AUTH_TOKEN:-}
+      HYDRADB_HTTP_URL: ${HYDRADB_HTTP_URL:-http://hydradb:8443}
+      HYDRADB_AUTH_TOKEN: ${HYDRADB_AUTH_TOKEN:?set HYDRADB_AUTH_TOKEN (>= 32 chars) in backend/.env}
       HYDRADB_NAMESPACE: ${HYDRADB_NAMESPACE:-default}
       HYDRADB_GRAPH_ID: ${HYDRADB_GRAPH_ID:-default}
       HYDRADB_CELL_ID: ${HYDRADB_CELL_ID:-cell-0}

@@ -7,3 +7,4 @@ compose*.yml
 .env
 .env.*
 *.md
+hydradb-data

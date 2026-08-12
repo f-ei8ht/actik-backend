@@ -4,3 +4,6 @@ node_modules/
 # env
 .env
 .env.*
+
+# hydradb data (store, cache, auth-token)
+hydradb-data/
