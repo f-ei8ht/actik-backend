@@ -1,0 +1,18 @@
+name: actik
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: prod.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-}
+      HYDRADB_HTTP_URL: ${HYDRADB_HTTP_URL:-http://127.0.0.1:8443}
+      HYDRADB_AUTH_TOKEN: ${HYDRADB_AUTH_TOKEN:-}
+      HYDRADB_NAMESPACE: ${HYDRADB_NAMESPACE:-default}
+      HYDRADB_GRAPH_ID: ${HYDRADB_GRAPH_ID:-default}
+      HYDRADB_CELL_ID: ${HYDRADB_CELL_ID:-cell-0}
+    ports:
+      - "8000:8000"
