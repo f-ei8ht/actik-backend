@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { env } from './lib/config'
+import graph from './routes/graph'
 
 const app = new Hono()
 
@@ -17,6 +18,8 @@ app.use(
 
 app.get('/', (c) => c.text('actik API'))
 app.get('/health', (c) => c.json({ status: 'ok' }))
+
+app.route('/api/graph', graph)
 
 export default {
   port: 8000,
