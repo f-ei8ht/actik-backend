@@ -1,12 +1,8 @@
 import { Hono } from 'hono'
-import { decodeValue, hydra, rowsToObjects, type Path } from '../hydra/client'
-import {
-  blastRadiusQuery,
-  countDirectDependentsQuery,
-  lookupPackageIdQuery,
-  seedEdgesQuery,
-  seedNodesQuery,
-} from '../hydra/queries'
+import { z } from 'zod'
+import { hydra } from '../hydra/client'
+import { seedEdgesQuery, seedNodesQuery } from '../hydra/queries'
+import { getDependencyGraph } from '../services/graph.service'
 
 const app = new Hono()
 
@@ -29,61 +25,13 @@ app.post('/seed', async (c) => {
   return c.json({ ok: true, nodes: demoNodes.length, edges: demoEdges.length })
 })
 
-async function resolvePackageId(name: string, version: string): Promise<number | null> {
-  const response = await hydra.query(lookupPackageIdQuery, {
-    parameters: { name, version },
-    consistency: 'causal',
-  })
-  const rows = rowsToObjects(response)
-  return rows.length ? Number(rows[0].id) : null
-}
+const nameSchema = z.string().min(1).max(200).regex(/^[@a-zA-Z0-9._~/-]+$/)
+const versionSchema = z.string().min(1).max(100)
 
-app.get('/blast-radius/:name/:version', async (c) => {
-  const name = c.req.param('name')
-  const version = c.req.param('version')
-  const source = await resolvePackageId(name, version)
-  if (source === null) {
-    return c.json({ package: { name, version }, dependents: [], count: 0 }, 404)
-  }
-
-  const response = await hydra.query(blastRadiusQuery(), {
-    parameters: { source },
-    consistency: 'causal',
-  })
-  const paths = response.rows.map((row) => decodeValue(row[0]) as Path)
-
-  const seen = new Set<number>()
-  const dependents: Record<string, unknown>[] = []
-  for (const path of paths) {
-    const target = path.nodes[path.nodes.length - 1]
-    if (!target || target.id === source || seen.has(target.id)) continue
-    seen.add(target.id)
-    dependents.push(target.properties)
-  }
-
-  return c.json({
-    package: { name, version },
-    dependents,
-    count: dependents.length,
-  })
-})
-
-app.get('/count/:name/:version', async (c) => {
-  const name = c.req.param('name')
-  const version = c.req.param('version')
-  const source = await resolvePackageId(name, version)
-  if (source === null) {
-    return c.json({ package: { name, version }, directDependents: 0 }, 404)
-  }
-  const response = await hydra.query(countDirectDependentsQuery, {
-    parameters: { id: source },
-    consistency: 'causal',
-  })
-  const rows = rowsToObjects(response)
-  return c.json({
-    package: { name, version },
-    directDependents: Number(rows[0]?.count ?? 0),
-  })
+app.get('/:name/:version', async (c) => {
+  const name = nameSchema.parse(c.req.param('name'))
+  const version = versionSchema.parse(c.req.param('version'))
+  return c.json(await getDependencyGraph(name, version))
 })
 
 export default app

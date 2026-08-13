@@ -18,7 +18,14 @@ export const NPM_SEEDS: SeedPackage[] = [
   { name: 'strip-ansi' },
   { name: 'ua-parser-js', versions: ['0.7.28'] },
   { name: 'node-fetch' },
-  { name: 'axios' },
+  { name: 'axios', versions: ['0.30.4', '1.14.1'] },
+  { name: 'keyv', versions: ['6.0.0'] },
+  { name: 'cacheable', versions: ['2.5.1'] },
+  { name: 'flat-cache', versions: ['6.1.24'] },
+  { name: 'file-entry-cache', versions: ['11.1.6'] },
+  { name: 'cache-manager', versions: ['7.2.10'] },
+  { name: '@bitwarden/cli', versions: ['2026.4.0'] },
+  { name: '@cap-js/sqlite', versions: ['2.2.2'] },
 ]
 
 export const PYPI_SEEDS: SeedPackage[] = [
@@ -38,4 +45,6 @@ export const PYPI_SEEDS: SeedPackage[] = [
   { name: 'idna' },
   { name: 'certifi' },
   { name: 'werkzeug' },
+  { name: 'litellm', versions: ['1.82.7', '1.82.8'] },
+  { name: 'mistralai', versions: ['2.4.6'] },
 ]

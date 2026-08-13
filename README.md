@@ -71,3 +71,22 @@ All endpoints and limits come from env vars in `.env.example`
 ```sh
 bun test
 ```
+
+## API
+
+Mounts at `/api`. Error responses use `{"error":{"code","message"}}`; 404 for
+unknown packages/advisories, 400 for invalid names, 429 when rate-limited.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/packages/:name` | Package overview + version list |
+| `GET /api/packages/:name/maintainers` | Maintainers of a package |
+| `GET /api/packages/:name/shared-maintainers` | Packages sharing a maintainer |
+| `GET /api/packages/:name/typosquats` | Similar-name candidates (npm search + Levenshtein) |
+| `GET /api/packages/:name/:version` | Version details + its advisories |
+| `GET /api/packages/:name/:version/dependencies` | Forward dependencies |
+| `GET /api/packages/:name/:version/dependents` | Direct dependents |
+| `GET /api/packages/:name/:version/blast-radius` | Direct/transitive dependents, max depth, paths, latency |
+| `GET /api/packages/:name/:version/graph` | Dependency neighborhood (for React Flow) |
+| `GET /api/advisories/:id` | Advisory details + affected versions |
+| `GET /api/graph/:name/:version` | Same as `.../graph` (alias) |

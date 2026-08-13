@@ -33,6 +33,88 @@ MATCH (s {id: $id})<-[:DEPENDS_ON]-(d:PackageVersion)
 RETURN count(*) AS count
 `
 
+export const packageByNameQuery = `
+MATCH (p:Package)
+WHERE p.name = $name
+RETURN p.name AS name, p.ecosystem AS ecosystem
+`
+
+export const versionsOfPackageQuery = `
+MATCH (v:PackageVersion)
+WHERE v.name = $name
+RETURN v.version AS version
+ORDER BY version
+`
+
+export const versionDetailsQuery = `
+MATCH (v:PackageVersion)
+WHERE v.name = $name AND v.version = $version
+RETURN v.name AS name, v.version AS version, v.ecosystem AS ecosystem
+`
+
+export const versionCountQuery = `
+MATCH (v:PackageVersion)
+WHERE v.name = $name
+RETURN count(*) AS count
+`
+
+export const dependenciesQuery = `
+MATCH (v:PackageVersion)
+WHERE v.name = $name AND v.version = $version
+MATCH (v)-[r:DEPENDS_ON]->(t:PackageVersion)
+RETURN t.name AS name, t.version AS version, t.ecosystem AS ecosystem
+ORDER BY t.name, t.version
+`
+
+export const dependentsQuery = `
+MATCH (v:PackageVersion)
+WHERE v.name = $name AND v.version = $version
+MATCH (d:PackageVersion)-[r:DEPENDS_ON]->(v)
+RETURN d.name AS name, d.version AS version, d.ecosystem AS ecosystem
+ORDER BY d.name, d.version
+`
+
+export const maintainersOfPackageQuery = `
+MATCH (p:Package)-[:MAINTAINED_BY]->(m:Maintainer)
+WHERE p.name = $name
+RETURN m.name AS name
+ORDER BY m.name
+`
+
+export const sharedMaintainersQuery = `
+MATCH (p:Package)-[:MAINTAINED_BY]->(m:Maintainer)<-[:MAINTAINED_BY]-(q:Package)
+WHERE p.name = $name AND q.name <> $name
+RETURN q.name AS name, m.name AS maintainer
+ORDER BY q.name
+`
+
+export const advisoryByIdQuery = `
+MATCH (a:Advisory)
+WHERE a.advisory_id = $id
+RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary,
+  a.published_at AS publishedAt, a.references AS references
+`
+
+export const advisoryAffectedVersionsQuery = `
+MATCH (v:PackageVersion)-[:AFFECTED_BY]->(a:Advisory)
+WHERE a.advisory_id = $id
+RETURN v.name AS name, v.version AS version, v.ecosystem AS ecosystem
+ORDER BY v.name, v.version
+`
+
+export const advisoriesForVersionQuery = `
+MATCH (v:PackageVersion)-[:AFFECTED_BY]->(a:Advisory)
+WHERE v.name = $name AND v.version = $version
+RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary
+ORDER BY a.severity
+`
+
+export const advisoryCountForPackageQuery = `
+MATCH (v:PackageVersion)-[:AFFECTED_BY]->(a:Advisory)
+WHERE v.name = $name
+RETURN count(*) AS count
+`
+
 export const upsertPackageNodesQuery = `
 UNWIND $nodes AS n
 MERGE (v {id: n.id})
