@@ -3,6 +3,7 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
+    "ingest": "bun run src/ingestion/runner.ts",
     "test": "bun test"
   },
   "dependencies": {

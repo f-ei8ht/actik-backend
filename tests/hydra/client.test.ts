@@ -1,11 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it, mock } from 'bun:test'
-import type { QueryResponse } from './schema'
+import type { QueryResponse } from '../../src/hydra/schema'
 
-let HydraClient: typeof import('./client').HydraClient
-let HydraError: typeof import('./client').HydraError
-let decodePath: typeof import('./client').decodePath
-let decodeValue: typeof import('./client').decodeValue
-let rowsToObjects: typeof import('./client').rowsToObjects
+let HydraClient: typeof import('../../src/hydra/client').HydraClient
+let HydraError: typeof import('../../src/hydra/client').HydraError
+let decodePath: typeof import('../../src/hydra/client').decodePath
+let decodeValue: typeof import('../../src/hydra/client').decodeValue
+let rowsToObjects: typeof import('../../src/hydra/client').rowsToObjects
 
 beforeAll(async () => {
   Bun.env.HYDRADB_HTTP_URL = 'http://127.0.0.1:8443'
@@ -13,7 +13,7 @@ beforeAll(async () => {
   Bun.env.HYDRADB_NAMESPACE = 'default'
   Bun.env.HYDRADB_GRAPH_ID = 'default'
   Bun.env.HYDRADB_CELL_ID = 'cell-0'
-  const module = await import('./client')
+  const module = await import('../../src/hydra/client')
   HydraClient = module.HydraClient
   HydraError = module.HydraError
   decodePath = module.decodePath

@@ -48,3 +48,26 @@ docker compose -f compose.prod.yml down
 
 Data lives in `./hydradb-data`; back it up or mount it from a persistent volume
 on the VPS.
+
+## Data ingestion
+
+Seeds a supply-chain graph into HydraDB from three sources — npm registry
+(+ npm bulk audit advisories), PyPI (via its JSON API vulnerabilities), and
+Google OSV — then builds `DEPENDS_ON` / `AFFECTED_BY` edges for blast-radius
+traversal.
+
+```sh
+cp .env.example .env
+bun run ingest   # or: docker compose exec api bun run ingest
+```
+
+All endpoints and limits come from env vars in `.env.example`
+(`NPM_REGISTRY_URL`, `PYPI_JSON_URL`, `OSV_API_URL`,
+`INGESTION_MAX_PACKAGES`, `INGESTION_MAX_DEPTH`, `INGESTION_MAX_ADVISORIES`,
+`INGESTION_CONCURRENCY`). Re-running is idempotent (stable vertex ids + MERGE).
+
+## Tests
+
+```sh
+bun test
+```

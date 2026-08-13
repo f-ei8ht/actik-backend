@@ -8,6 +8,13 @@ const envSchema = z.object({
   HYDRADB_NAMESPACE: z.string().default('default'),
   HYDRADB_GRAPH_ID: z.string().default('default'),
   HYDRADB_CELL_ID: z.string().default('cell-0'),
+  NPM_REGISTRY_URL: z.string().url().default('https://registry.npmjs.org'),
+  PYPI_JSON_URL: z.string().url().default('https://pypi.org/pypi'),
+  OSV_API_URL: z.string().url().default('https://api.osv.dev'),
+  INGESTION_MAX_PACKAGES: z.coerce.number().int().positive().default(50),
+  INGESTION_MAX_DEPTH: z.coerce.number().int().positive().default(2),
+  INGESTION_MAX_ADVISORIES: z.coerce.number().int().positive().default(500),
+  INGESTION_CONCURRENCY: z.coerce.number().int().positive().default(8),
 })
 
 export const env = envSchema.parse(Bun.env)

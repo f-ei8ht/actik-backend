@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { hydra } from '../hydra/client'
-import type { QueryResponse } from '../hydra/schema'
-import graph from './graph'
+import { hydra } from '../../src/hydra/client'
+import type { QueryResponse } from '../../src/hydra/schema'
+import graph from '../../src/routes/graph'
 
 function envelope(columns: string[], rows: QueryResponse['rows']): QueryResponse {
   return {

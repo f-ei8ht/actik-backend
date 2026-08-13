@@ -8,3 +8,4 @@ compose*.yml
 .env.*
 *.md
 hydradb-data
+tests
