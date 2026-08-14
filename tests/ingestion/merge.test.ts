@@ -11,6 +11,7 @@ function record(advisoryId: string, affected: AdvisoryRecord['affected']): Advis
       severity: 'HIGH',
       summary: advisoryId,
       publishedAt: '',
+      modifiedAt: '',
       references: '',
     },
     affected,

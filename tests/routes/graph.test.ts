@@ -22,6 +22,7 @@ function envelope(columns: string[], rows: QueryResponse['rows']): QueryResponse
 }
 
 const str = (value: string) => ({ type: 'string' as const, value })
+const int = (value: number) => ({ type: 'integer' as const, value })
 
 describe('POST /api/graph/seed', () => {
   it('writes the demo nodes and edges', async () => {
@@ -39,25 +40,33 @@ describe('POST /api/graph/seed', () => {
 })
 
 describe('GET /api/graph/:name/:version', () => {
-  it('returns the dependency neighborhood graph', async () => {
+  it('returns the dependency neighborhood graph with resolving repositories', async () => {
     querySpy = spyOn(hydra, 'query')
     querySpy
-      .mockResolvedValueOnce(envelope(['name', 'version', 'ecosystem'], [[str('lodash'), str('4.17.20'), str('npm')]]))
+      .mockResolvedValueOnce(envelope(['id', 'name', 'version', 'ecosystem'], [[int(1), str('lodash'), str('4.17.20'), str('npm')]]))
       .mockResolvedValueOnce(envelope(['name', 'version', 'ecosystem'], [[str('qs'), str('6.15.3'), str('npm')]]))
       .mockResolvedValueOnce(envelope(['name', 'version', 'ecosystem'], [[str('express'), str('5.2.1'), str('npm')]]))
       .mockResolvedValueOnce(envelope(['id', 'severity', 'summary'], [[str('GHSA-x'), str('HIGH'), str('proto pollution')]]))
+      .mockResolvedValueOnce(
+        envelope(
+          ['repository', 'lockfile', 'commitSha', 'kind', 'requestedVersion', 'resolvedVersion'],
+          [[str('payments-api'), str('payments-api/package-lock.json'), str('abc'), str('application'), str('^4.17.0'), str('4.17.20')]]
+        )
+      )
 
     const res = await app.request('/api/graph/lodash/4.17.20')
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.root).toBe('lodash@4.17.20')
     expect(body.nodes.map((n: { label: string }) => n.label)).toContain('express')
+    expect(body.nodes.map((n: { type: string; label: string }) => n.label)).toContain('payments-api')
     expect(body.edges.some((e: { type: string }) => e.type === 'affected_by')).toBe(true)
+    expect(body.edges.some((e: { type: string }) => e.type === 'resolves')).toBe(true)
   })
 
   it('returns 404 for unknown versions', async () => {
     querySpy = spyOn(hydra, 'query')
-    querySpy.mockResolvedValue(envelope(['name', 'version', 'ecosystem'], []))
+    querySpy.mockResolvedValue(envelope(['id', 'name', 'version', 'ecosystem'], []))
     const res = await app.request('/api/graph/lodash/9.9.9')
     expect(res.status).toBe(404)
   })

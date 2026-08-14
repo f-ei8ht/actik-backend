@@ -40,14 +40,14 @@ describe('parsePypiRequiresDist', () => {
 
 describe('fetchNpmPackage', () => {
   it('fetches and shapes the npm document', async () => {
-    globalThis.fetch = mock(async () =>
+    globalThis.fetch = (mock(async () =>
       jsonResponse({
         name: 'lodash',
         'dist-tags': { latest: '4.17.21' },
         maintainers: [{ name: 'jdalton' }],
         versions: { '4.17.21': { version: '4.17.21', dependencies: { x: '^1.0.0' } } },
       })
-    )
+    ) as unknown as typeof fetch)
 
     const raw = await fetchNpmPackage('lodash', 'https://registry.npmjs.org')
     expect(raw).toEqual({
@@ -56,20 +56,20 @@ describe('fetchNpmPackage', () => {
       maintainers: [{ name: 'jdalton' }],
       versions: { '4.17.21': { version: '4.17.21', dependencies: { x: '^1.0.0' } } },
     })
-    expect(String((globalThis.fetch as ReturnType<typeof mock>).mock.calls[0][0])).toBe(
+    expect(String((globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls[0][0])).toBe(
       'https://registry.npmjs.org/lodash'
     )
   })
 
   it('returns null for 404', async () => {
-    globalThis.fetch = mock(async () => new Response('not found', { status: 404 }))
+    globalThis.fetch = (mock(async () => new Response('not found', { status: 404 })) as unknown as typeof fetch)
     expect(await fetchNpmPackage('nope', 'https://registry.npmjs.org')).toBeNull()
   })
 })
 
 describe('fetchPypiPackage', () => {
   it('fetches and shapes the PyPI document', async () => {
-    globalThis.fetch = mock(async () =>
+    globalThis.fetch = (mock(async () =>
       jsonResponse({
         info: {
           name: 'requests',
@@ -79,19 +79,19 @@ describe('fetchPypiPackage', () => {
           requires_dist: ['urllib3 (<3,>=1.21.1)'],
         },
       })
-    )
+    ) as unknown as typeof fetch)
 
     const raw = await fetchPypiPackage('requests', 'https://pypi.org/pypi')
     expect(raw?.latest).toBe('2.32.0')
     expect(raw?.author).toBe('Kenneth Reitz')
     expect(raw?.requiresDist).toEqual([{ name: 'urllib3', specifier: '<3,>=1.21.1' }])
-    expect(String((globalThis.fetch as ReturnType<typeof mock>).mock.calls[0][0])).toBe(
+    expect(String((globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls[0][0])).toBe(
       'https://pypi.org/pypi/requests/json'
     )
   })
 
   it('returns null for 404', async () => {
-    globalThis.fetch = mock(async () => new Response('not found', { status: 404 }))
+    globalThis.fetch = (mock(async () => new Response('not found', { status: 404 })) as unknown as typeof fetch)
     expect(await fetchPypiPackage('nope', 'https://pypi.org/pypi')).toBeNull()
   })
 })

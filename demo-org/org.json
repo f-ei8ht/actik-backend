@@ -1,0 +1,36 @@
+{
+  "org": "Acme",
+  "commitSha": "demo-2026-08-01",
+  "repositories": [
+    {
+      "name": "payments-api",
+      "language": "typescript",
+      "kind": "application",
+      "lockfiles": [{ "path": "payments-api/package-lock.json", "ecosystem": "npm" }]
+    },
+    {
+      "name": "storefront",
+      "language": "typescript",
+      "kind": "application",
+      "lockfiles": [{ "path": "storefront/package-lock.json", "ecosystem": "npm" }]
+    },
+    {
+      "name": "notification-service",
+      "language": "typescript",
+      "kind": "service",
+      "lockfiles": [{ "path": "notification-service/package-lock.json", "ecosystem": "npm" }]
+    },
+    {
+      "name": "analytics-worker",
+      "language": "python",
+      "kind": "worker",
+      "lockfiles": [{ "path": "analytics-worker/uv.lock", "ecosystem": "PyPI" }]
+    },
+    {
+      "name": "recommendation-service",
+      "language": "python",
+      "kind": "service",
+      "lockfiles": [{ "path": "recommendation-service/requirements.txt", "ecosystem": "PyPI" }]
+    }
+  ]
+}

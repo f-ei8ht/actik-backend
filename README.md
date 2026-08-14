@@ -56,6 +56,12 @@ Seeds a supply-chain graph into HydraDB from three sources — npm registry
 Google OSV — then builds `DEPENDS_ON` / `AFFECTED_BY` edges for blast-radius
 traversal.
 
+After the package graph is written, the runner also ingests a synthetic
+organization from `demo-org/` (see `DEMO_ORG_PATH`): each repository's
+lockfiles (`package-lock.json`, `uv.lock`, `requirements.txt`) are parsed into
+`Repository → HAS_LOCKFILE → Lockfile → RESOLVES → PackageVersion` edges,
+keeping the *exact resolved version* plus the *requested range* as evidence.
+
 ```sh
 cp .env.example .env
 bun run ingest   # or: docker compose exec api bun run ingest
@@ -64,18 +70,23 @@ bun run ingest   # or: docker compose exec api bun run ingest
 All endpoints and limits come from env vars in `.env.example`
 (`NPM_REGISTRY_URL`, `PYPI_JSON_URL`, `OSV_API_URL`,
 `INGESTION_MAX_PACKAGES`, `INGESTION_MAX_DEPTH`, `INGESTION_MAX_ADVISORIES`,
-`INGESTION_CONCURRENCY`). Re-running is idempotent (stable vertex ids + MERGE).
+`INGESTION_CONCURRENCY`, `DEMO_ORG_PATH`). Re-running is idempotent (stable
+vertex ids + MERGE).
 
 ## Tests
 
 ```sh
 bun test
+bunx tsc --noEmit
 ```
 
 ## API
 
 Mounts at `/api`. Error responses use `{"error":{"code","message"}}`; 404 for
 unknown packages/advisories, 400 for invalid names, 429 when rate-limited.
+
+All `:name` / `:name/:version` routes accept an optional `?ecosystem=npm|PyPI`
+query parameter to disambiguate packages that share a name across ecosystems.
 
 | Route | Purpose |
 |---|---|
@@ -86,7 +97,7 @@ unknown packages/advisories, 400 for invalid names, 429 when rate-limited.
 | `GET /api/packages/:name/:version` | Version details + its advisories |
 | `GET /api/packages/:name/:version/dependencies` | Forward dependencies |
 | `GET /api/packages/:name/:version/dependents` | Direct dependents |
-| `GET /api/packages/:name/:version/blast-radius` | Direct/transitive dependents, max depth, paths, latency |
-| `GET /api/packages/:name/:version/graph` | Dependency neighborhood (for React Flow) |
+| `GET /api/packages/:name/:version/blast-radius` | Direct/transitive dependents, max depth, paths, latency, affected repositories + resolution evidence |
+| `GET /api/packages/:name/:version/graph` | Dependency neighborhood (for React Flow), incl. resolving repositories |
 | `GET /api/advisories/:id` | Advisory details + affected versions |
 | `GET /api/graph/:name/:version` | Same as `.../graph` (alias) |

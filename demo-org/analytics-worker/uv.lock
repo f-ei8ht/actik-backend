@@ -1,0 +1,33 @@
+version = 1
+requires-python = ">=3.11"
+
+[[package]]
+name = "analytics-worker"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "paramiko" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+
+[[package]]
+name = "paramiko"
+version = "5.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://pypi.org/packages/source/p/paramiko/paramiko-5.0.0.tar.gz", hash = "sha256:demo" }
+wheels = [{ url = "https://pypi.org/packages/py3/p/paramiko/paramiko-5.0.0-py3-none-any.whl", hash = "sha256:demo" }]
+
+[[package]]
+name = "requests"
+version = "2.26.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://pypi.org/packages/source/r/requests/requests-2.26.0.tar.gz", hash = "sha256:demo" }
+wheels = [{ url = "https://pypi.org/packages/py3/r/requests/requests-2.26.0-py3-none-any.whl", hash = "sha256:demo" }]
+
+[[package]]
+name = "urllib3"
+version = "1.26.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://pypi.org/packages/source/u/urllib3/urllib3-1.26.4.tar.gz", hash = "sha256:demo" }
+wheels = [{ url = "https://pypi.org/packages/py3/u/urllib3/urllib3-1.26.4-py3-none-any.whl", hash = "sha256:demo" }]

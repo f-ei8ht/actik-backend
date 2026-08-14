@@ -77,15 +77,19 @@ describe('GET /api/packages/:name/:version/blast-radius', () => {
           ]
         )
       )
-      .mockResolvedValue(envelope(['name', 'repository'], []))
+      .mockResolvedValue(
+        envelope(['repository', 'lockfile', 'commitSha', 'kind', 'requestedVersion', 'resolvedVersion'], [])
+      )
 
     const res = await app.request('/api/packages/lodash/4.17.20/blast-radius')
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.package).toEqual({ name: 'lodash', version: '4.17.20' })
+    expect(body.package).toEqual({ name: 'lodash', version: '4.17.20', ecosystem: '' })
     expect(body.directDependents).toBe(1)
     expect(body.count).toBe(1)
+    expect(body.affectedRepositories).toBe(0)
     expect(body.affectedApplications).toBe(0)
+    expect(body.resolutions).toEqual([])
     expect(typeof body.latencyMs).toBe('number')
   })
 

@@ -15,6 +15,7 @@ const envSchema = z.object({
   INGESTION_MAX_DEPTH: z.coerce.number().int().positive().default(2),
   INGESTION_MAX_ADVISORIES: z.coerce.number().int().positive().default(500),
   INGESTION_CONCURRENCY: z.coerce.number().int().positive().default(8),
+  DEMO_ORG_PATH: z.string().default('demo-org'),
 })
 
 export const env = envSchema.parse(Bun.env)

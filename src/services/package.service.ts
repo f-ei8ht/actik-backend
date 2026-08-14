@@ -28,16 +28,25 @@ export interface VersionRelationships {
   dependents: VersionDetails[]
 }
 
-export async function getPackageOverview(name: string): Promise<PackageOverview> {
+export async function getPackageOverview(name: string, ecosystem?: string): Promise<PackageOverview> {
   const packageRows = rowsToObjects(
-    await hydra.query(packageByNameQuery, { parameters: { name }, consistency: 'causal' })
+    await hydra.query(packageByNameQuery(ecosystem), {
+      parameters: { name, ...(ecosystem ? { ecosystem } : {}) },
+      consistency: 'causal',
+    })
   )
   if (packageRows.length === 0) throw notFound(`package '${name}' not found`)
   const [versionCount] = rowsToObjects(
-    await hydra.query(versionCountQuery, { parameters: { name }, consistency: 'causal' })
+    await hydra.query(versionCountQuery(ecosystem), {
+      parameters: { name, ...(ecosystem ? { ecosystem } : {}) },
+      consistency: 'causal',
+    })
   )
   const [advisoryCount] = rowsToObjects(
-    await hydra.query(advisoryCountForPackageQuery, { parameters: { name }, consistency: 'causal' })
+    await hydra.query(advisoryCountForPackageQuery(ecosystem), {
+      parameters: { name, ...(ecosystem ? { ecosystem } : {}) },
+      consistency: 'causal',
+    })
   )
   return {
     name: String(packageRows[0].name),
@@ -47,17 +56,24 @@ export async function getPackageOverview(name: string): Promise<PackageOverview>
   }
 }
 
-export async function listVersions(name: string): Promise<string[]> {
+export async function listVersions(name: string, ecosystem?: string): Promise<string[]> {
   const rows = rowsToObjects(
-    await hydra.query(versionsOfPackageQuery, { parameters: { name }, consistency: 'causal' })
+    await hydra.query(versionsOfPackageQuery(ecosystem), {
+      parameters: { name, ...(ecosystem ? { ecosystem } : {}) },
+      consistency: 'causal',
+    })
   )
   return rows.map((row) => String(row.version))
 }
 
-export async function getVersionDetails(name: string, version: string): Promise<VersionDetails> {
+export async function getVersionDetails(
+  name: string,
+  version: string,
+  ecosystem?: string
+): Promise<VersionDetails> {
   const rows = rowsToObjects(
-    await hydra.query(versionDetailsQuery, {
-      parameters: { name, version },
+    await hydra.query(versionDetailsQuery(ecosystem), {
+      parameters: { name, version, ...(ecosystem ? { ecosystem } : {}) },
       consistency: 'causal',
     })
   )
@@ -71,13 +87,15 @@ export async function getVersionDetails(name: string, version: string): Promise<
 
 export async function getVersionRelationships(
   name: string,
-  version: string
+  version: string,
+  ecosystem?: string
 ): Promise<VersionRelationships> {
+  const params = { name, version, ...(ecosystem ? { ecosystem } : {}) }
   const dependencies = rowsToObjects(
-    await hydra.query(dependenciesQuery, { parameters: { name, version }, consistency: 'causal' })
+    await hydra.query(dependenciesQuery(ecosystem), { parameters: params, consistency: 'causal' })
   )
   const dependents = rowsToObjects(
-    await hydra.query(dependentsQuery, { parameters: { name, version }, consistency: 'causal' })
+    await hydra.query(dependentsQuery(ecosystem), { parameters: params, consistency: 'causal' })
   )
   return {
     dependencies: dependencies.map(toVersionDetails),

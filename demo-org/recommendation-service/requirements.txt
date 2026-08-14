@@ -1,0 +1,3 @@
+# recommendation-service pinned dependencies
+requests==2.26.0
+matplotlib==3.11.1

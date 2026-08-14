@@ -3,11 +3,10 @@ import {
   affectedPackages,
   isAffectedVersion,
   normalizeAdvisory,
-  normalizeApplications,
   normalizePackage,
 } from '../../src/ingestion/normalize'
 import type { NpmPackageRaw, PypiPackageRaw } from '../../src/ingestion/registry/registry'
-import { applicationId, packageVersionId } from '../../src/ingestion/types'
+import { packageVersionId } from '../../src/ingestion/types'
 import type { OsvVulnDoc } from '../../src/ingestion/version'
 
 const npmRaw: NpmPackageRaw = {
@@ -110,43 +109,5 @@ describe('normalizeAdvisory', () => {
     expect(affectedPackages(doc)).toEqual([{ ecosystem: 'npm', name: 'lodash' }])
     expect(isAffectedVersion(doc, 'npm', 'lodash', '4.17.20')).toBe(true)
     expect(isAffectedVersion(doc, 'npm', 'lodash', '4.17.21')).toBe(false)
-  })
-})
-
-describe('normalizeApplications', () => {
-  it('creates application nodes and USED_BY edges for known versions', () => {
-    const pvId = packageVersionId('npm', 'express', '5.2.1')
-    const versionIndex = new Map<string, number>([['npm:express:5.2.1', pvId]])
-    const { nodes, edges } = normalizeApplications(
-      [
-        {
-          name: 'payments-service',
-          repository: 'acme/payments-service',
-          packages: [{ ecosystem: 'npm', name: 'express', version: '5.2.1' }],
-        },
-      ],
-      versionIndex
-    )
-
-    expect(nodes).toEqual([
-      { id: applicationId('payments-service'), name: 'payments-service', repository: 'acme/payments-service' },
-    ])
-    expect(edges).toHaveLength(1)
-    expect(edges[0]).toMatchObject({ source: pvId, target: applicationId('payments-service') })
-  })
-
-  it('skips USED_BY edges for versions not in the graph', () => {
-    const { nodes, edges } = normalizeApplications(
-      [
-        {
-          name: 'ghost-app',
-          repository: 'acme/ghost-app',
-          packages: [{ ecosystem: 'npm', name: 'does-not-exist', version: '9.9.9' }],
-        },
-      ],
-      new Map()
-    )
-    expect(nodes).toHaveLength(1)
-    expect(edges).toHaveLength(0)
   })
 })

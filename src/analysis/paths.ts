@@ -25,6 +25,7 @@ export function summarizePaths(
   maxPaths = 100
 ): PathSummary {
   const seen = new Set<number>()
+  const directIds = new Set<number>()
   const affectedVersionIds = new Set<number>([sourceId])
   const directDependents: AffectedVersion[] = []
   const transitiveDependents: AffectedVersion[] = []
@@ -48,7 +49,8 @@ export function summarizePaths(
       seen.add(last.id)
       transitiveDependents.push(dependent)
     }
-    if (depth === 1 && !directDependents.some((entry) => entry.name === dependent.name)) {
+    if (depth === 1 && !directIds.has(last.id)) {
+      directIds.add(last.id)
       directDependents.push(dependent)
     }
     if (paths.length < maxPaths) {

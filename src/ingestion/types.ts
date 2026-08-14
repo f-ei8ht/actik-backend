@@ -30,16 +30,59 @@ export interface AdvisoryNode {
   references: string
 }
 
-export interface ApplicationNode {
+export interface OrganizationNode {
   id: number
   name: string
-  repository: string
 }
 
-export interface ApplicationInput {
+export interface RepositoryNode {
+  id: number
   name: string
+  org: string
+  language: string
+  kind: string
+}
+
+export interface LockfileNode {
+  id: number
+  path: string
+  ecosystem: Ecosystem
   repository: string
-  packages: Array<{ ecosystem: Ecosystem; name: string; version: string }>
+  commitSha: string
+  kind: string
+}
+
+export interface ResolvedDependency {
+  ecosystem: Ecosystem
+  name: string
+  requestedVersion?: string
+  resolvedVersion: string
+}
+
+export interface RepoLockfileRef {
+  path: string
+  ecosystem: Ecosystem
+}
+
+export interface DemoRepo {
+  name: string
+  language: string
+  kind: string
+  lockfiles: RepoLockfileRef[]
+}
+
+export interface DemoOrgManifest {
+  org: string
+  commitSha: string
+  repositories: DemoRepo[]
+}
+
+export interface ResolvesEdge extends Edge {
+  requestedVersion: string
+  resolvedVersion: string
+  lockfilePath: string
+  repository: string
+  commitSha: string
 }
 
 export interface Edge {
@@ -85,7 +128,14 @@ export const maintainerId = (ecosystem: Ecosystem, name: string) =>
 
 export const advisoryNodeId = (advisoryId: string) => hashString(`adv:${advisoryId}`)
 
-export const applicationId = (name: string) => hashString(`app:${name}`)
+export const organizationId = (name: string) => hashString(`org:${name}`)
+
+export const repositoryId = (org: string, name: string) => hashString(`repo:${org}:${name}`)
+
+export const lockfileId = (repository: string, path: string) => hashString(`lockfile:${repository}:${path}`)
+
+export const resolvesEdgeId = (lockfile: number, version: number, requested?: string) =>
+  hashString(`resolves:${lockfile}:${version}:${requested ?? ''}`)
 
 export const edgeId = (type: string, source: number, target: number) =>
   hashString(`edge:${type}:${source}:${target}`)

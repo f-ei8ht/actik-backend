@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { GraphWriter, WRITE_BATCH_SIZE } from '../../src/ingestion/graph-writer'
-import { edgeId, packageVersionId } from '../../src/ingestion/types'
+import { edgeId, packageVersionId, type ResolvesEdge } from '../../src/ingestion/types'
 import type { QueryResponse } from '../../src/hydra/schema'
-
 class FakeClient {
   calls: Array<{ query: string; parameters: Record<string, unknown> }> = []
 
@@ -73,11 +72,60 @@ describe('GraphWriter', () => {
     expect((edgeCalls[2].parameters.edges as unknown[]).length).toBe(10)
   })
 
+  it('writes organization, repository and lockfile node batches', async () => {
+    const client = new FakeClient()
+    const writer = new GraphWriter(client as never)
+
+    writer.addOrganizations([{ id: 1, name: 'Acme' }])
+    writer.addRepositories([{ id: 2, name: 'payments-api', org: 'Acme', language: 'typescript', kind: 'application' }])
+    writer.addLockfiles([
+      { id: 3, path: 'payments-api/package-lock.json', ecosystem: 'npm', repository: 'payments-api', commitSha: 'abc', kind: 'application' },
+    ])
+
+    await writer.flush()
+
+    const queries = client.calls.map((call) => call.query)
+    expect(queries.some((q) => q.includes('SET v:Organization'))).toBe(true)
+    expect(queries.some((q) => q.includes('SET v:Repository'))).toBe(true)
+    expect(queries.some((q) => q.includes('SET v:Lockfile'))).toBe(true)
+  })
+
+  it('writes RESOLVES edges with resolution evidence properties', async () => {
+    const client = new FakeClient()
+    const writer = new GraphWriter(client as never)
+
+    const resolves: ResolvesEdge[] = [
+      {
+        id: edgeId('RESOLVES', 3, 4),
+        source: 3,
+        target: 4,
+        requestedVersion: '^4.17.0',
+        resolvedVersion: '4.17.20',
+        lockfilePath: 'payments-api/package-lock.json',
+        repository: 'payments-api',
+        commitSha: 'abc',
+      },
+    ]
+    writer.addEdges('RESOLVES', resolves)
+
+    await writer.flush()
+
+    const call = client.calls.find((entry) => entry.query.includes('MERGE (s)-[r:RESOLVES'))
+    expect(call).toBeDefined()
+    expect(call?.query).toContain('r.resolved_version = e.resolvedVersion')
+    const edges = call?.parameters.edges as Array<Record<string, string>>
+    expect(edges[0].requestedVersion).toBe('^4.17.0')
+    expect(edges[0].resolvedVersion).toBe('4.17.20')
+  })
+
   it('returns a write summary', async () => {
     const client = new FakeClient()
     const writer = new GraphWriter(client as never)
     writer.addPackages([{ id: 1, name: 'a', ecosystem: 'npm' }])
     writer.addVersions([{ id: 2, packageId: 1, name: 'a', version: '1.0.0', ecosystem: 'npm' }])
+    writer.addOrganizations([{ id: 10, name: 'Acme' }])
+    writer.addRepositories([{ id: 11, name: 'r', org: 'Acme', language: 'typescript', kind: 'application' }])
+    writer.addLockfiles([{ id: 12, path: 'r/package-lock.json', ecosystem: 'npm', repository: 'r', commitSha: 'x', kind: 'application' }])
     writer.addEdges('DEPENDS_ON', [{ id: 3, source: 2, target: 4 }])
 
     const summary = await writer.flush()
@@ -86,7 +134,9 @@ describe('GraphWriter', () => {
       versions: 1,
       maintainers: 0,
       advisories: 0,
-      applications: 0,
+      organizations: 1,
+      repositories: 1,
+      lockfiles: 1,
       edges: { DEPENDS_ON: 1 },
     })
   })

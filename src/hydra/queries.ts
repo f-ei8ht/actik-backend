@@ -1,3 +1,6 @@
+const withEcosystem = (alias: string, ecosystem?: string) =>
+  ecosystem ? ` AND ${alias}.ecosystem = $ecosystem` : ''
+
 export const seedNodesQuery = `
 UNWIND $nodes AS n
 MERGE (v {id: n.id})
@@ -10,9 +13,9 @@ MATCH (s:PackageVersion {id: e.source}), (t:PackageVersion {id: e.target})
 MERGE (s)-[r:DEPENDS_ON {id: e.id}]->(t)
 `
 
-export const lookupPackageIdQuery = `
+export const lookupPackageIdQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)
-WHERE v.name = $name AND v.version = $version
+WHERE v.name = $name AND v.version = $version${withEcosystem('v', ecosystem)}
 RETURN v.id AS id
 `
 
@@ -28,62 +31,57 @@ YIELD path
 RETURN path
 `
 
-export const countDirectDependentsQuery = `
-MATCH (s {id: $id})<-[:DEPENDS_ON]-(d:PackageVersion)
-RETURN count(*) AS count
-`
-
-export const packageByNameQuery = `
+export const packageByNameQuery = (ecosystem?: string) => `
 MATCH (p:Package)
-WHERE p.name = $name
+WHERE p.name = $name${withEcosystem('p', ecosystem)}
 RETURN p.name AS name, p.ecosystem AS ecosystem
 `
 
-export const versionsOfPackageQuery = `
+export const versionsOfPackageQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)
-WHERE v.name = $name
+WHERE v.name = $name${withEcosystem('v', ecosystem)}
 RETURN v.version AS version
 ORDER BY version
 `
 
-export const versionDetailsQuery = `
+export const versionDetailsQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)
-WHERE v.name = $name AND v.version = $version
-RETURN v.name AS name, v.version AS version, v.ecosystem AS ecosystem
+WHERE v.name = $name AND v.version = $version${withEcosystem('v', ecosystem)}
+RETURN v.id AS id, v.name AS name, v.version AS version, v.ecosystem AS ecosystem
 `
 
-export const versionCountQuery = `
+export const versionCountQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)
-WHERE v.name = $name
+WHERE v.name = $name${withEcosystem('v', ecosystem)}
 RETURN count(*) AS count
 `
 
-export const dependenciesQuery = `
+export const dependenciesQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)
-WHERE v.name = $name AND v.version = $version
+WHERE v.name = $name AND v.version = $version${withEcosystem('v', ecosystem)}
 MATCH (v)-[r:DEPENDS_ON]->(t:PackageVersion)
 RETURN t.name AS name, t.version AS version, t.ecosystem AS ecosystem
 ORDER BY t.name, t.version
 `
 
-export const dependentsQuery = `
+export const dependentsQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)
-WHERE v.name = $name AND v.version = $version
+WHERE v.name = $name AND v.version = $version${withEcosystem('v', ecosystem)}
 MATCH (d:PackageVersion)-[r:DEPENDS_ON]->(v)
 RETURN d.name AS name, d.version AS version, d.ecosystem AS ecosystem
 ORDER BY d.name, d.version
 `
 
-export const maintainersOfPackageQuery = `
+export const maintainersOfPackageQuery = (ecosystem?: string) => `
 MATCH (p:Package)-[:MAINTAINED_BY]->(m:Maintainer)
-WHERE p.name = $name
+WHERE p.name = $name${withEcosystem('p', ecosystem)}
 RETURN m.name AS name
 ORDER BY m.name
 `
 
-export const sharedMaintainersQuery = `
+export const sharedMaintainersQuery = (ecosystem?: string) => `
 MATCH (p:Package)-[:MAINTAINED_BY]->(m:Maintainer)<-[:MAINTAINED_BY]-(q:Package)
-WHERE p.name = $name AND q.name <> $name
+WHERE p.name = $name AND q.name <> $name${withEcosystem('p', ecosystem)}
 RETURN q.name AS name, m.name AS maintainer
 ORDER BY q.name
 `
@@ -102,16 +100,16 @@ RETURN v.name AS name, v.version AS version, v.ecosystem AS ecosystem
 ORDER BY v.name, v.version
 `
 
-export const advisoriesForVersionQuery = `
+export const advisoriesForVersionQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)-[:AFFECTED_BY]->(a:Advisory)
-WHERE v.name = $name AND v.version = $version
+WHERE v.name = $name AND v.version = $version${withEcosystem('v', ecosystem)}
 RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary
 ORDER BY a.severity
 `
 
-export const advisoryCountForPackageQuery = `
+export const advisoryCountForPackageQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)-[:AFFECTED_BY]->(a:Advisory)
-WHERE v.name = $name
+WHERE v.name = $name${withEcosystem('v', ecosystem)}
 RETURN count(*) AS count
 `
 
@@ -149,21 +147,61 @@ SET v:Advisory,
   v.references = n.references
 `
 
-export const upsertApplicationNodesQuery = `
+export const upsertOrganizationNodesQuery = `
 UNWIND $nodes AS n
 MERGE (v {id: n.id})
-SET v:Application, v.name = n.name, v.repository = n.repository
+SET v:Organization, v.name = n.name
 `
 
-export const applicationsUsingVersionQuery = `
-MATCH (v:PackageVersion)-[:USED_BY]->(a:Application)
+export const upsertRepositoryNodesQuery = `
+UNWIND $nodes AS n
+MERGE (v {id: n.id})
+SET v:Repository,
+  v.name = n.name,
+  v.org = n.org,
+  v.language = n.language,
+  v.kind = n.kind
+`
+
+export const upsertLockfileNodesQuery = `
+UNWIND $nodes AS n
+MERGE (v {id: n.id})
+SET v:Lockfile,
+  v.path = n.path,
+  v.ecosystem = n.ecosystem,
+  v.repository = n.repository,
+  v.commit_sha = n.commitSha,
+  v.kind = n.kind
+`
+
+export const resolutionsForVersionQuery = `
+MATCH (l:Lockfile)-[r:RESOLVES]->(v:PackageVersion)
 WHERE v.id = $id
-RETURN a.name AS name, a.repository AS repository
-ORDER BY a.name
+RETURN l.repository AS repository, l.path AS lockfile, l.commit_sha AS commitSha, l.kind AS kind,
+  r.requested_version AS requestedVersion, r.resolved_version AS resolvedVersion
+ORDER BY l.repository, l.path
+`
+
+export const reposByVersionIdQuery = `
+MATCH (l:Lockfile)-[:RESOLVES]->(v:PackageVersion)
+WHERE v.id = $id
+RETURN DISTINCT l.repository AS name, l.kind AS kind
+ORDER BY l.repository
 `
 
 export const upsertEdgesQuery = (type: string, sourceLabel: string, targetLabel: string) => `
 UNWIND $edges AS e
 MATCH (s:${sourceLabel} {id: e.source}), (t:${targetLabel} {id: e.target})
 MERGE (s)-[r:${type} {id: e.id}]->(t)
+`
+
+export const upsertResolvesEdgesQuery = `
+UNWIND $edges AS e
+MATCH (s:Lockfile {id: e.source}), (t:PackageVersion {id: e.target})
+MERGE (s)-[r:RESOLVES {id: e.id}]->(t)
+SET r.requested_version = e.requestedVersion,
+    r.resolved_version = e.resolvedVersion,
+    r.lockfile_path = e.lockfilePath,
+    r.repository = e.repository,
+    r.commit_sha = e.commitSha
 `

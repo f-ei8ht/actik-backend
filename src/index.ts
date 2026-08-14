@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger as honoLogger } from 'hono/logger'
 import { ZodError } from 'zod'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { env } from './lib/config'
 import { AppError } from './lib/errors'
 import { log } from './lib/logger'
@@ -36,7 +37,7 @@ app.route('/api/graph', graph)
 app.onError((error, c) => {
   if (error instanceof AppError) {
     log.warn('request failed', { code: error.code, status: error.status, message: error.message })
-    return c.json({ error: { code: error.code, message: error.message } }, error.status)
+    return c.json({ error: { code: error.code, message: error.message } }, error.status as ContentfulStatusCode)
   }
   if (error instanceof ZodError) {
     log.warn('invalid request parameters', { issues: error.issues })

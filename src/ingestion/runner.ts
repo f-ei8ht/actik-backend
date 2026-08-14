@@ -1,16 +1,25 @@
 import { env } from '../lib/config'
 import { fetchAdvisories } from './advisory'
-import { DEMO_APPLICATIONS } from './applications'
 import { GraphWriter } from './graph-writer'
-import { normalizeApplications, normalizePackage } from './normalize'
+import { loadDemoOrg, readLockfile } from './lockfile/demo-org'
+import { parseLockfile } from './lockfile'
+import { normalizePackage } from './normalize'
 import { fetchRegistryPackage, type NpmPackageRaw, type PypiPackageRaw } from './registry'
 import { NPM_SEEDS, PYPI_SEEDS, type SeedPackage } from './seeds'
 import {
   edgeId,
+  lockfileId,
+  organizationId,
+  repositoryId,
+  resolvesEdgeId,
   type DependencySpec,
   type Ecosystem,
   type Edge,
+  type LockfileNode,
+  type OrganizationNode,
   type PackageVersionNode,
+  type RepositoryNode,
+  type ResolvesEdge,
 } from './types'
 
 interface QueueEntry {
@@ -63,7 +72,7 @@ export async function runIngestion(): Promise<void> {
   const writer = new GraphWriter()
 
   const versionByPackage = new Map<string, PackageVersionNode[]>()
-  const allSpecs: Array<{ ecosystem: Ecosystem; spec: DependencySpec }> = []
+  const allSpecs: Array<{ ecosystem: Ecosystem; spec: DependencySpec[] }> = []
   const packages: Array<{ ecosystem: Ecosystem; name: string }> = []
 
   const seen = new Set<string>()
@@ -171,9 +180,7 @@ export async function runIngestion(): Promise<void> {
   }
   writer.addEdges('AFFECTED_BY', affectedEdges)
 
-  const applications = normalizeApplications(DEMO_APPLICATIONS, versionIdByKey)
-  writer.addApplications(applications.nodes)
-  writer.addEdges('USED_BY', applications.edges)
+  await ingestDemoOrg(writer, versionIdByKey)
 
   const summary = await writer.flush()
   const durationMs = Date.now() - startedAt
@@ -185,8 +192,85 @@ export async function runIngestion(): Promise<void> {
   console.log(`  versions:      ${summary.versions}`)
   console.log(`  maintainers:   ${summary.maintainers}`)
   console.log(`  advisories:    ${summary.advisories}`)
+  console.log(`  organizations: ${summary.organizations}`)
+  console.log(`  repositories:  ${summary.repositories}`)
+  console.log(`  lockfiles:     ${summary.lockfiles}`)
   console.log(`  edges:         ${JSON.stringify(summary.edges)}`)
   console.log(`  duration:      ${(durationMs / 1000).toFixed(1)}s`)
+}
+
+async function ingestDemoOrg(
+  writer: GraphWriter,
+  versionIdByKey: Map<string, number>
+): Promise<void> {
+  const manifest = loadDemoOrg(env.DEMO_ORG_PATH)
+  if (!manifest) {
+    console.warn(`demo org manifest not found at ${env.DEMO_ORG_PATH}; skipping organization graph`)
+    return
+  }
+
+  const orgNode: OrganizationNode = { id: organizationId(manifest.org), name: manifest.org }
+  writer.addOrganizations([orgNode])
+  const ownsEdges: Edge[] = []
+
+  for (const repo of manifest.repositories) {
+    const repoId = repositoryId(manifest.org, repo.name)
+    const repoNode: RepositoryNode = {
+      id: repoId,
+      name: repo.name,
+      org: manifest.org,
+      language: repo.language,
+      kind: repo.kind,
+    }
+    writer.addRepositories([repoNode])
+    ownsEdges.push({ id: edgeId('OWNS', orgNode.id, repoId), source: orgNode.id, target: repoId })
+
+    const hasLockfileEdges: Edge[] = []
+    const resolvesEdges: ResolvesEdge[] = []
+    for (const lockfile of repo.lockfiles) {
+      const content = readLockfile(env.DEMO_ORG_PATH, lockfile.path)
+      if (!content) {
+        console.warn(`  lockfile not found: ${lockfile.path}`)
+        continue
+      }
+      const dependencies = parseLockfile(lockfile.path, lockfile.ecosystem, content)
+      const lockId = lockfileId(repo.name, lockfile.path)
+      const lockNode: LockfileNode = {
+        id: lockId,
+        path: lockfile.path,
+        ecosystem: lockfile.ecosystem,
+        repository: repo.name,
+        commitSha: manifest.commitSha,
+        kind: repo.kind,
+      }
+      writer.addLockfiles([lockNode])
+      hasLockfileEdges.push({ id: edgeId('HAS_LOCKFILE', repoId, lockId), source: repoId, target: lockId })
+
+      let linked = 0
+      for (const dep of dependencies) {
+        const versionId = versionIdByKey.get(`${dep.ecosystem}:${dep.name}:${dep.resolvedVersion}`)
+        if (versionId === undefined) continue
+        resolvesEdges.push({
+          id: resolvesEdgeId(lockId, versionId, dep.requestedVersion),
+          source: lockId,
+          target: versionId,
+          requestedVersion: dep.requestedVersion ?? '',
+          resolvedVersion: dep.resolvedVersion,
+          lockfilePath: lockfile.path,
+          repository: repo.name,
+          commitSha: manifest.commitSha,
+        })
+        linked += 1
+      }
+      console.log(
+        `  ${repo.name} ${lockfile.path}: ${dependencies.length} resolved, ${linked} linked to graph`
+      )
+    }
+    writer.addEdges('HAS_LOCKFILE', hasLockfileEdges)
+    writer.addEdges('RESOLVES', resolvesEdges)
+  }
+
+  writer.addEdges('OWNS', ownsEdges)
 }
 
 if (import.meta.main) {

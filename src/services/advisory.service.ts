@@ -45,10 +45,14 @@ export async function getAdvisory(id: string): Promise<AdvisoryDetails> {
   }
 }
 
-export async function getAdvisoriesForVersion(name: string, version: string): Promise<AdvisoryDetails[]> {
+export async function getAdvisoriesForVersion(
+  name: string,
+  version: string,
+  ecosystem?: string
+): Promise<AdvisoryDetails[]> {
   const rows = rowsToObjects(
-    await hydra.query(advisoriesForVersionQuery, {
-      parameters: { name, version },
+    await hydra.query(advisoriesForVersionQuery(ecosystem), {
+      parameters: { name, version, ...(ecosystem ? { ecosystem } : {}) },
       consistency: 'causal',
     })
   )
@@ -57,6 +61,7 @@ export async function getAdvisoriesForVersion(name: string, version: string): Pr
     severity: String(row.severity),
     summary: String(row.summary),
     publishedAt: '',
+    modifiedAt: '',
     references: '',
     affectedVersions: [],
   }))

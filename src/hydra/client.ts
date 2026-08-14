@@ -142,7 +142,7 @@ export function decodeValue(value: HydraValue): unknown {
     case 'vertex_id':
       return value.value
     case 'list':
-      return value.value.map(decodeValue)
+      return value.value.map((entry) => decodeValue(entry as HydraValue))
     case 'path':
       return decodePath(value.value)
   }

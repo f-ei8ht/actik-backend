@@ -1,8 +1,9 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { hydra } from '../hydra/client'
 import { seedEdgesQuery, seedNodesQuery } from '../hydra/queries'
 import { getDependencyGraph } from '../services/graph.service'
+import type { Ecosystem } from '../ingestion/types'
 
 const app = new Hono()
 
@@ -27,11 +28,17 @@ app.post('/seed', async (c) => {
 
 const nameSchema = z.string().min(1).max(200).regex(/^[@a-zA-Z0-9._~/-]+$/)
 const versionSchema = z.string().min(1).max(100)
+const ecosystemSchema = z.enum(['npm', 'PyPI'])
+
+function ecosystemParam(c: Context): Ecosystem | undefined {
+  const raw = c.req.query('ecosystem')
+  return raw ? ecosystemSchema.parse(raw) : undefined
+}
 
 app.get('/:name/:version', async (c) => {
   const name = nameSchema.parse(c.req.param('name'))
   const version = versionSchema.parse(c.req.param('version'))
-  return c.json(await getDependencyGraph(name, version))
+  return c.json(await getDependencyGraph(name, version, ecosystemParam(c)))
 })
 
 export default app

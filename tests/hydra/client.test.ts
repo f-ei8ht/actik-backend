@@ -137,7 +137,7 @@ describe('HydraClient.query', () => {
       next_cursor: null,
       bookmark: 'sgk:1',
     }
-    globalThis.fetch = mock(async (url: unknown, init: RequestInit) => {
+    globalThis.fetch = (mock(async (url: unknown, init: RequestInit) => {
       expect(String(url)).toBe('http://127.0.0.1:8443/v1/graphs/default/query')
       expect(init.method).toBe('POST')
       const headers = init.headers as Record<string, string>
@@ -148,7 +148,7 @@ describe('HydraClient.query', () => {
         query: 'MATCH (n) RETURN n.id',
       })
       return jsonResponse(responseBody)
-    })
+    }) as unknown as typeof fetch)
 
     const client = new HydraClient()
     const result = await client.query('MATCH (n) RETURN n.id')
@@ -157,7 +157,7 @@ describe('HydraClient.query', () => {
   })
 
   it('sends optional parameters and consistency', async () => {
-    globalThis.fetch = mock(async (_url: unknown, init: RequestInit) => {
+    globalThis.fetch = (mock(async (_url: unknown, init: RequestInit) => {
       const body = JSON.parse(String(init.body))
       expect(body.parameters).toEqual({ name: 'lodash' })
       expect(body.consistency).toBe('causal')
@@ -170,7 +170,7 @@ describe('HydraClient.query', () => {
         next_cursor: null,
         bookmark: null,
       })
-    })
+    }) as unknown as typeof fetch)
 
     const client = new HydraClient()
     await client.query('MATCH (n {name: $name}) RETURN n', {
@@ -181,11 +181,11 @@ describe('HydraClient.query', () => {
   })
 
   it('parses the error envelope into a HydraError', async () => {
-    globalThis.fetch = mock(async () =>
+    globalThis.fetch = (mock(async () =>
       jsonResponse({ error: { code: 'invalid_request', message: 'bad query' } }, 400)
-    )
+    ) as unknown as typeof fetch)
     const client = new HydraClient()
-    const error = await client.query('BAD').catch((err) => err as HydraError)
+    const error = (await client.query('BAD').catch((err) => err)) as InstanceType<typeof HydraError>
     expect(error).toBeInstanceOf(HydraError)
     expect(error.status).toBe(400)
     expect(error.code).toBe('invalid_request')
@@ -193,9 +193,9 @@ describe('HydraClient.query', () => {
   })
 
   it('keeps the raw body for non-JSON errors', async () => {
-    globalThis.fetch = mock(async () => new Response('upstream exploded', { status: 502 }))
+    globalThis.fetch = (mock(async () => new Response('upstream exploded', { status: 502 })) as unknown as typeof fetch)
     const client = new HydraClient()
-    const error = await client.query('MATCH (n) RETURN n').catch((err) => err as HydraError)
+    const error = (await client.query('MATCH (n) RETURN n').catch((err) => err)) as InstanceType<typeof HydraError>
     expect(error).toBeInstanceOf(HydraError)
     expect(error.status).toBe(502)
     expect(error.code).toBe('http_error')
@@ -203,9 +203,9 @@ describe('HydraClient.query', () => {
   })
 
   it('throws invalid_response on an unexpected success body', async () => {
-    globalThis.fetch = mock(async () => jsonResponse({ unexpected: true }))
+    globalThis.fetch = (mock(async () => jsonResponse({ unexpected: true })) as unknown as typeof fetch)
     const client = new HydraClient()
-    const error = await client.query('MATCH (n) RETURN n').catch((err) => err as HydraError)
+    const error = (await client.query('MATCH (n) RETURN n').catch((err) => err)) as InstanceType<typeof HydraError>
     expect(error).toBeInstanceOf(HydraError)
     expect(error.code).toBe('invalid_response')
   })
