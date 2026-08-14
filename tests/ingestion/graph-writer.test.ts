@@ -86,6 +86,7 @@ describe('GraphWriter', () => {
       versions: 1,
       maintainers: 0,
       advisories: 0,
+      applications: 0,
       edges: { DEPENDS_ON: 1 },
     })
   })

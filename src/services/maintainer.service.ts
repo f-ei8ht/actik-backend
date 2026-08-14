@@ -1,6 +1,7 @@
 import { hydra, rowsToObjects } from '../hydra/client'
 import { maintainersOfPackageQuery, sharedMaintainersQuery } from '../hydra/queries'
 import { notFound } from '../lib/errors'
+import { groupSharedMaintainers, type MaintainerGroup } from '../analysis/maintainers'
 
 export interface SharedMaintainerLink {
   package: string
@@ -15,12 +16,14 @@ export async function getMaintainers(name: string): Promise<string[]> {
   return rows.map((row) => String(row.name))
 }
 
-export async function getSharedMaintainers(name: string): Promise<SharedMaintainerLink[]> {
+export async function getSharedMaintainers(name: string): Promise<MaintainerGroup[]> {
   const rows = rowsToObjects(
     await hydra.query(sharedMaintainersQuery, { parameters: { name }, consistency: 'causal' })
   )
-  return rows.map((row) => ({
-    package: String(row.name),
-    maintainer: String(row.maintainer),
-  }))
+  return groupSharedMaintainers(
+    rows.map((row) => ({
+      package: String(row.name),
+      maintainer: String(row.maintainer),
+    }))
+  )
 }

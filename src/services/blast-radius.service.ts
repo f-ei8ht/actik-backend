@@ -10,6 +10,8 @@ export async function getBlastRadius(name: string, version: string) {
     transitiveDependents: result.transitiveDependents.length,
     count: result.count,
     maxDepth: result.maxDepth,
+    affectedApplications: result.affectedApplications.length,
+    applications: result.affectedApplications,
     dependents: result.transitiveDependents,
     paths: result.paths,
     latencyMs: result.latencyMs,

@@ -62,6 +62,7 @@ export async function fetchPypiAdvisories(packages: AdvisoryPackage[]): Promise<
         severity: 'UNKNOWN',
         summary: vulnerability.summary ?? vulnerability.details ?? vulnerability.id,
         publishedAt: '',
+        modifiedAt: '',
         references: vulnerability.link ?? '',
       }
       records.push({

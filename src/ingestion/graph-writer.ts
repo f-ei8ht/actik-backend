@@ -1,6 +1,7 @@
 import { hydra, type HydraClient } from '../hydra/client'
 import {
   upsertAdvisoryNodesQuery,
+  upsertApplicationNodesQuery,
   upsertEdgesQuery,
   upsertMaintainerNodesQuery,
   upsertPackageNodesQuery,
@@ -8,6 +9,7 @@ import {
 } from '../hydra/queries'
 import type {
   AdvisoryNode,
+  ApplicationNode,
   Edge,
   MaintainerNode,
   PackageNode,
@@ -21,6 +23,7 @@ export const EDGE_SPECS: Record<string, { sourceLabel: string; targetLabel: stri
   MAINTAINED_BY: { sourceLabel: 'Package', targetLabel: 'Maintainer' },
   DEPENDS_ON: { sourceLabel: 'PackageVersion', targetLabel: 'PackageVersion' },
   AFFECTED_BY: { sourceLabel: 'PackageVersion', targetLabel: 'Advisory' },
+  USED_BY: { sourceLabel: 'PackageVersion', targetLabel: 'Application' },
 }
 
 export interface WriteSummary {
@@ -28,6 +31,7 @@ export interface WriteSummary {
   versions: number
   maintainers: number
   advisories: number
+  applications: number
   edges: Record<string, number>
 }
 
@@ -52,6 +56,10 @@ export class GraphWriter {
     this.writeBatches(upsertAdvisoryNodesQuery, nodes, 'nodes')
   }
 
+  addApplications(nodes: ApplicationNode[]) {
+    this.writeBatches(upsertApplicationNodesQuery, nodes, 'nodes')
+  }
+
   addEdges(type: string, edges: Edge[]) {
     if (edges.length === 0) return
     const bucket = (this.edges[type] ??= [])
@@ -74,6 +82,7 @@ export class GraphWriter {
       versions: this.versionCount,
       maintainers: this.maintainerCount,
       advisories: this.advisoryCount,
+      applications: this.applicationCount,
       edges: Object.fromEntries(edgeTypes.map((type) => [type, this.edges[type].length])),
     }
   }
@@ -82,6 +91,7 @@ export class GraphWriter {
   private versionCount = 0
   private maintainerCount = 0
   private advisoryCount = 0
+  private applicationCount = 0
 
   private async writeBatches(
     query: string,
@@ -105,6 +115,9 @@ export class GraphWriter {
         break
       case upsertAdvisoryNodesQuery:
         this.advisoryCount += rows.length
+        break
+      case upsertApplicationNodesQuery:
+        this.applicationCount += rows.length
         break
     }
   }

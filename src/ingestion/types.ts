@@ -26,7 +26,20 @@ export interface AdvisoryNode {
   severity: string
   summary: string
   publishedAt: string
+  modifiedAt: string
   references: string
+}
+
+export interface ApplicationNode {
+  id: number
+  name: string
+  repository: string
+}
+
+export interface ApplicationInput {
+  name: string
+  repository: string
+  packages: Array<{ ecosystem: Ecosystem; name: string; version: string }>
 }
 
 export interface Edge {
@@ -71,6 +84,8 @@ export const maintainerId = (ecosystem: Ecosystem, name: string) =>
   hashString(`maint:${ecosystem}:${name}`)
 
 export const advisoryNodeId = (advisoryId: string) => hashString(`adv:${advisoryId}`)
+
+export const applicationId = (name: string) => hashString(`app:${name}`)
 
 export const edgeId = (type: string, source: number, target: number) =>
   hashString(`edge:${type}:${source}:${target}`)

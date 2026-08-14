@@ -1,6 +1,8 @@
 import type { NpmPackageRaw, PypiPackageRaw } from './registry/registry'
 import type {
   AdvisoryNode,
+  ApplicationInput,
+  ApplicationNode,
   DependencySpec,
   Ecosystem,
   Edge,
@@ -11,6 +13,7 @@ import type {
 } from './types'
 import {
   advisoryNodeId,
+  applicationId,
   edgeId,
   maintainerId,
   packageId,
@@ -138,8 +141,40 @@ export function normalizeAdvisory(doc: OsvVulnDoc): AdvisoryNode {
     severity: extractSeverity(doc),
     summary: doc.summary ?? doc.details ?? doc.id,
     publishedAt: doc.published ?? '',
+    modifiedAt: doc.modified ?? '',
     references: (doc.references ?? []).map((ref) => ref.url ?? '').filter(Boolean).join('\n'),
   }
+}
+
+export interface NormalizedApplications {
+  nodes: ApplicationNode[]
+  edges: Edge[]
+}
+
+export function normalizeApplications(
+  inputs: ApplicationInput[],
+  versionIdByKey: Map<string, number>
+): NormalizedApplications {
+  const nodes: ApplicationNode[] = []
+  const edges: Edge[] = []
+  for (const input of inputs) {
+    const node: ApplicationNode = {
+      id: applicationId(input.name),
+      name: input.name,
+      repository: input.repository,
+    }
+    nodes.push(node)
+    for (const pkg of input.packages) {
+      const source = versionIdByKey.get(`${pkg.ecosystem}:${pkg.name}:${pkg.version}`)
+      if (source === undefined) continue
+      edges.push({
+        id: edgeId('USED_BY', source, node.id),
+        source,
+        target: node.id,
+      })
+    }
+  }
+  return { nodes, edges }
 }
 
 function extractSeverity(doc: OsvVulnDoc): string {

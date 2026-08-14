@@ -12,6 +12,7 @@ export interface AdvisoryDetails {
   severity: string
   summary: string
   publishedAt: string
+  modifiedAt: string
   references: string
   affectedVersions: VersionDetails[]
 }
@@ -34,6 +35,7 @@ export async function getAdvisory(id: string): Promise<AdvisoryDetails> {
     severity: String(rows[0].severity),
     summary: String(rows[0].summary),
     publishedAt: String(rows[0].publishedAt ?? ''),
+    modifiedAt: String(rows[0].modifiedAt ?? ''),
     references: String(rows[0].references ?? ''),
     affectedVersions: affectedRows.map((row) => ({
       name: String(row.name),

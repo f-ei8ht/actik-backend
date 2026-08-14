@@ -92,7 +92,7 @@ export const advisoryByIdQuery = `
 MATCH (a:Advisory)
 WHERE a.advisory_id = $id
 RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary,
-  a.published_at AS publishedAt, a.references AS references
+  a.published_at AS publishedAt, a.modified_at AS modifiedAt, a.references AS references
 `
 
 export const advisoryAffectedVersionsQuery = `
@@ -145,7 +145,21 @@ SET v:Advisory,
   v.severity = n.severity,
   v.summary = n.summary,
   v.published_at = n.publishedAt,
+  v.modified_at = n.modifiedAt,
   v.references = n.references
+`
+
+export const upsertApplicationNodesQuery = `
+UNWIND $nodes AS n
+MERGE (v {id: n.id})
+SET v:Application, v.name = n.name, v.repository = n.repository
+`
+
+export const applicationsUsingVersionQuery = `
+MATCH (v:PackageVersion)-[:USED_BY]->(a:Application)
+WHERE v.id = $id
+RETURN a.name AS name, a.repository AS repository
+ORDER BY a.name
 `
 
 export const upsertEdgesQuery = (type: string, sourceLabel: string, targetLabel: string) => `

@@ -39,6 +39,17 @@ function idResponse(id: number): QueryResponse {
   }
 }
 
+function emptyApplicationResponse(): QueryResponse {
+  return {
+    query_id: 'q',
+    columns: ['name', 'repository'],
+    rows: [],
+    read_epoch: 1,
+    next_cursor: null,
+    bookmark: null,
+  }
+}
+
 describe('computeBlastRadius', () => {
   it('separates direct and transitive dependents from paths', async () => {
     querySpy = spyOn(hydra, 'query')
@@ -51,6 +62,7 @@ describe('computeBlastRadius', () => {
           [node(1, 'lodash', '4.17.20'), node(2, 'express', '4.18.2'), node(3, 'next', '14.0.0')],
         ])
       )
+      .mockResolvedValue(emptyApplicationResponse())
 
     const result = await computeBlastRadius('lodash', '4.17.20')
 

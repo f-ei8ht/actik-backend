@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { getBlastRadius } from '../services/blast-radius.service'
 import { getDependencyGraph } from '../services/graph.service'
 import { getMaintainers, getSharedMaintainers } from '../services/maintainer.service'
 import { listVersions, getPackageOverview, getVersionDetails, getVersionRelationships } from '../services/package.service'
@@ -63,12 +62,6 @@ app.get('/:name/:version/dependents', async (c) => {
   const version = versionSchema.parse(c.req.param('version'))
   const { dependents } = await getVersionRelationships(name, version)
   return c.json({ package: { name, version }, dependents })
-})
-
-app.get('/:name/:version/blast-radius', async (c) => {
-  const name = nameSchema.parse(c.req.param('name'))
-  const version = versionSchema.parse(c.req.param('version'))
-  return c.json(await getBlastRadius(name, version))
 })
 
 app.get('/:name/:version/graph', async (c) => {

@@ -19,6 +19,8 @@ export interface OsvVulnDoc {
   summary?: string
   details?: string
   published?: string
+  modified?: string
+  withdrawn?: string
   severity?: Array<{ type?: string; score?: string | number }>
   database_specific?: Record<string, unknown>
   references?: Array<{ type?: string; url?: string }>

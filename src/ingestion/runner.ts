@@ -1,7 +1,8 @@
 import { env } from '../lib/config'
 import { fetchAdvisories } from './advisory'
+import { DEMO_APPLICATIONS } from './applications'
 import { GraphWriter } from './graph-writer'
-import { normalizePackage } from './normalize'
+import { normalizeApplications, normalizePackage } from './normalize'
 import { fetchRegistryPackage, type NpmPackageRaw, type PypiPackageRaw } from './registry'
 import { NPM_SEEDS, PYPI_SEEDS, type SeedPackage } from './seeds'
 import {
@@ -169,6 +170,10 @@ export async function runIngestion(): Promise<void> {
     }
   }
   writer.addEdges('AFFECTED_BY', affectedEdges)
+
+  const applications = normalizeApplications(DEMO_APPLICATIONS, versionIdByKey)
+  writer.addApplications(applications.nodes)
+  writer.addEdges('USED_BY', applications.edges)
 
   const summary = await writer.flush()
   const durationMs = Date.now() - startedAt

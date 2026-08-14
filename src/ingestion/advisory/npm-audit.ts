@@ -49,6 +49,7 @@ export async function fetchNpmAuditAdvisories(packages: AdvisoryPackage[]): Prom
         severity: (advisory.severity ?? 'unknown').toUpperCase(),
         summary: advisory.title ?? advisory.url ?? `npm advisory ${advisory.id}`,
         publishedAt: '',
+        modifiedAt: '',
         references: advisory.url ?? '',
       }
       const versions = packageVersions.filter((version) =>
