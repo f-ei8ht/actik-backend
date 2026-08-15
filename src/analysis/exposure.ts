@@ -13,6 +13,8 @@ export interface ResolvedDepRef {
   requestedVersion?: string
   resolvedVersion: string
   lockfilePath: string
+  /** node_modules path within the lockfile */
+  path?: string
 }
 
 export interface ScanFinding {

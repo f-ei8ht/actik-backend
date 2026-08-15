@@ -71,7 +71,7 @@ describe('parseLockfile dispatch', () => {
   })
 
   it('throws for unsupported lockfiles', () => {
-    expect(() => parseLockfile('pnpm-lock.yaml', 'npm', '')).toThrow(/not implemented/)
+    expect(() => parseLockfile('x/bun.lockb', 'npm', '')).toThrow(/binary/)
     expect(() => parseLockfile('x/weird.lock', 'PyPI', '')).toThrow(/unsupported lockfile/)
   })
 })

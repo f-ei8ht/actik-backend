@@ -45,25 +45,35 @@ export function parseNpmPackageLock(content: string): ResolvedDependency[] {
     }
   }
 
-  const resolved = new Map<string, string>()
+  // Every node_modules path is a distinct resolution: npm allows the same
+  // package at different versions under nested node_modules, so `name` alone
+  // is not enough. Dedupe by (path, version) but keep every distinct version.
+  const resolved = new Map<string, ResolvedDependency>()
   if (doc.packages) {
     for (const [key, entry] of Object.entries(doc.packages)) {
       if (key === '' || !entry?.version) continue
       const name = nameFromLockfileKey(key)
-      if (name) resolved.set(name, entry.version)
+      if (!name) continue
+      resolved.set(`${key}:${entry.version}`, {
+        ecosystem: 'npm' as const,
+        name,
+        requestedVersion: requested.get(name),
+        resolvedVersion: entry.version,
+        path: key,
+      })
     }
   } else if (doc.dependencies) {
     for (const [name, entry] of Object.entries(doc.dependencies)) {
-      if (entry?.version) resolved.set(name, entry.version)
+      if (!entry?.version) continue
+      resolved.set(`${name}:${entry.version}`, {
+        ecosystem: 'npm' as const,
+        name,
+        requestedVersion: requested.get(name),
+        resolvedVersion: entry.version,
+        path: `node_modules/${name}`,
+      })
     }
   }
 
-  return [...resolved]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, resolvedVersion]) => ({
-      ecosystem: 'npm' as const,
-      name,
-      requestedVersion: requested.get(name),
-      resolvedVersion,
-    }))
+  return [...resolved.values()].sort((a, b) => a.name.localeCompare(b.name))
 }

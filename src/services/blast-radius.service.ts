@@ -16,6 +16,7 @@ export async function getBlastRadius(name: string, version: string, ecosystem?: 
     applications: result.applications,
     dependents: result.transitiveDependents,
     paths: result.paths,
+    repositoryPaths: result.repositoryPaths,
     resolutions: result.resolutions,
     latencyMs: result.latencyMs,
   }

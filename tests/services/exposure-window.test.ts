@@ -64,6 +64,12 @@ describe('getExposureWindow', () => {
     expect(result.exposedWhileLive.map((app) => app.repository)).toEqual(['payments-api'])
     expect(result.currentlyAffected).toHaveLength(3)
     expect(result.affectedApps).toEqual(['legacy-service', 'payments-api', 'storefront'])
+    expect(result.conclusions).toEqual({
+      exposed: ['payments-api'],
+      atRisk: ['storefront', 'legacy-service'],
+    })
+    expect(result.exposedWhileLive[0].conclusion).toBe('EXPOSED')
+    expect(result.currentlyAffected[1].conclusion).toBe('AT_RISK')
   })
 
   it('applies an as-of cutoff to ignore later resolutions', async () => {

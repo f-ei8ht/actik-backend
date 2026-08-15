@@ -7,6 +7,11 @@ MERGE (v {id: n.id})
 SET v:PackageVersion, v.name = n.name, v.version = n.version, v.ecosystem = n.ecosystem
 `
 
+export const clearDependencyEdgesQuery = `
+MATCH ()-[r:DEPENDS_ON]->()
+DELETE r
+`
+
 export const seedEdgesQuery = `
 UNWIND $edges AS e
 MATCH (s:PackageVersion {id: e.source}), (t:PackageVersion {id: e.target})
@@ -84,6 +89,13 @@ MATCH (p:Package)-[:MAINTAINED_BY]->(m:Maintainer)<-[:MAINTAINED_BY]-(q:Package)
 WHERE p.name = $name AND q.name <> $name${withEcosystem('p', ecosystem)}
 RETURN q.name AS name, m.name AS maintainer
 ORDER BY q.name
+`
+
+export const repositoriesForPackageQuery = (ecosystem?: string) => `
+MATCH (p:Package)-[:HAS_VERSION]->(v:PackageVersion)<-[:RESOLVES]-(l:Lockfile)
+WHERE p.name = $name${withEcosystem('p', ecosystem)}
+RETURN DISTINCT l.repository AS repository, v.version AS version
+ORDER BY l.repository, v.version
 `
 
 export const advisoryByIdQuery = `
@@ -181,7 +193,8 @@ export const resolutionsForVersionQuery = `
 MATCH (l:Lockfile)-[r:RESOLVES]->(v:PackageVersion)
 WHERE v.id = $id
 RETURN l.repository AS repository, l.path AS lockfile, l.commit_sha AS commitSha, l.kind AS kind,
-  r.requested_version AS requestedVersion, r.resolved_version AS resolvedVersion
+  r.requested_version AS requestedVersion, r.resolved_version AS resolvedVersion,
+  r.internal_path AS internalPath
 ORDER BY l.repository, l.path
 `
 
@@ -288,5 +301,6 @@ SET r.requested_version = e.requestedVersion,
     r.lockfile_path = e.lockfilePath,
     r.repository = e.repository,
     r.commit_sha = e.commitSha,
+    r.internal_path = e.internalPath,
     r.scanned_at = e.scannedAt
 `

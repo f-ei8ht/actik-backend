@@ -78,11 +78,17 @@ Seeds a supply-chain graph into HydraDB from three sources — npm registry
 Google OSV — then builds `DEPENDS_ON` / `AFFECTED_BY` edges for blast-radius
 traversal.
 
+`DEPENDS_ON` edges are **version-to-version exact**: each dependency
+declaration resolves to a single target version, preferring the version a real
+lockfile resolved for the same source (lockfile-grounded), falling back to the
+best range match. This keeps blast radius trustworthy — `express@5.2.1` points
+at `qs@6.5.2`, not at every `qs` release.
+
 After the package graph is written, the runner also ingests a synthetic
 organization from `demo-org/` (see `DEMO_ORG_PATH`): each repository's
-lockfiles (`package-lock.json`, `uv.lock`, `requirements.txt`) are parsed into
-`Repository → HAS_LOCKFILE → Lockfile → RESOLVES → PackageVersion` edges,
-keeping the *exact resolved version* plus the *requested range* as evidence.
+lockfiles are parsed into `Repository → HAS_LOCKFILE → Lockfile → RESOLVES →
+PackageVersion` edges, keeping the *exact resolved version*, the *requested
+range*, and the internal `node_modules` path as evidence.
 
 ```sh
 cp .env.example .env
@@ -119,23 +125,26 @@ query parameter to disambiguate packages that share a name across ecosystems.
 | `GET /api/packages/:name/:version` | Version details + its advisories |
 | `GET /api/packages/:name/:version/dependencies` | Forward dependencies |
 | `GET /api/packages/:name/:version/dependents` | Direct dependents |
-| `GET /api/packages/:name/:version/blast-radius` | Direct/transitive dependents, max depth, paths, latency, affected repositories + resolution evidence |
+| `GET /api/packages/:name/:version/blast-radius` | Direct/transitive dependents, max depth, paths, **per-repository exposure paths**, latency, affected repositories + resolution evidence |
 | `GET /api/packages/:name/:version/graph` | Dependency neighborhood (for React Flow), incl. resolving repositories |
 | `GET /api/advisories/:id` | Advisory details + affected versions + known fixed versions |
-| `GET /api/advisories/:id/exposure-window` | Apps that resolved an affected version **while the advisory was live** (`scanned_at` within `[published_at, modified_at]`); optional `?asOf=YYYY-MM-DD` snapshot |
+| `GET /api/advisories/:id/exposure-window` | Apps that resolved an affected version **while the advisory was live** (`scanned_at` within `[published_at, modified_at]`) with a per-app **`EXPOSED` / `AT_RISK` conclusion**; optional `?asOf=YYYY-MM-DD` snapshot |
 | `GET /api/graph/:name/:version` | Same as `.../graph` (alias) |
 | `POST /api/scan` | Scan a GitHub repo (`{"repo":"owner/name"}`): fetch manifests, resolve exact versions, write into the graph, return exposure score + findings + fixes + minimal-fix set |
 | `GET /api/scan/:owner/:name` | Re-run analysis for a previously scanned repo from the graph (no re-fetch) |
 | `GET /api/simulate/propagation/:name/:version` | Worm simulation: compromise a package at `?compromisedAt=`, compute each app's time-to-exposure from DEPENDS_ON depth (`?perHopMs=`, default 6 min) |
+| `GET /api/investigate/:ecosystem/:name/:version` | One-call investigation: version details + advisories + blast radius + **maintainer risk** (maintainers → other packages → repositories) + typosquats + recommendations |
 | `POST /api/watch/run` | Live-watch pass: poll OSV for every scanned/resolved version, record newly-flagged advisories as Alert nodes with `first_seen_at` |
 | `GET /api/watch/status` | Last live-watch run summary |
 | `GET /api/watch/incidents` | Recent incidents, each with its exposure path (`repo → lockfile → pkg@version → advisory`) |
 
 ### Scanner
 
-`POST /api/scan` pulls `package-lock.json`, `uv.lock` or `requirements*.txt`
-straight from `raw.githubusercontent.com` (no clone, no token), parses the
-exact resolved versions, upserts the repo into HydraDB, and returns:
+`POST /api/scan` pulls `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`,
+`bun.lock`, `uv.lock` or `requirements*.txt` straight from
+`raw.githubusercontent.com` (no clone, no token), parses the exact resolved
+versions (including nested `node_modules` resolutions), upserts the repo into
+HydraDB, and returns:
 
 - an **exposure score** (0–100) weighted by severity × count,
 - each vulnerable package with its advisory, the **exact fix** (e.g.

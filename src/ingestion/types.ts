@@ -59,6 +59,8 @@ export interface ResolvedDependency {
   name: string
   requestedVersion?: string
   resolvedVersion: string
+  /** node_modules path within the lockfile (nested deps can repeat a name) */
+  path?: string
 }
 
 export interface RepoLockfileRef {
@@ -87,6 +89,7 @@ export interface ResolvesEdge extends Edge {
   repository: string
   commitSha: string
   scannedAt?: string
+  internalPath?: string
 }
 
 export interface Edge {
@@ -98,6 +101,7 @@ export interface Edge {
 export interface DependencySpec {
   source: number
   name: string
+  range?: string
 }
 
 export interface NormalizedPackage {

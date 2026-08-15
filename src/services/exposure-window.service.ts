@@ -11,6 +11,13 @@ export interface ExposureApp {
   ecosystem: string
   requestedVersion: string
   scannedAt: string
+  /**
+   * Security conclusion for this app:
+   * - EXPOSED    — resolved the affected version while the advisory was live
+   * - AT_RISK    — currently resolves an affected version, scan outside window
+   * - NOT_AFFECTED — resolved the package but a version outside the affected range
+   */
+  conclusion: 'EXPOSED' | 'AT_RISK' | 'NOT_AFFECTED'
 }
 
 export interface ExposureWindowResult {
@@ -22,6 +29,7 @@ export interface ExposureWindowResult {
     modifiedAt: string
   }
   window: { start: string; end: string; live: boolean }
+  conclusions: { exposed: string[]; atRisk: string[] }
   exposedWhileLive: ExposureApp[]
   currentlyAffected: ExposureApp[]
   affectedApps: string[]
@@ -52,28 +60,27 @@ export async function getExposureWindow(
   const modifiedAt = String(first.modifiedAt ?? '')
   const end = modifiedAt || publishedAt
 
-  const apps: ExposureApp[] = rows.map((row) => ({
-    repository: String(row.repository),
-    lockfile: String(row.lockfile),
-    kind: String(row.kind ?? ''),
-    name: String(row.name),
-    version: String(row.version),
-    ecosystem: String(row.ecosystem ?? ''),
-    requestedVersion: String(row.requestedVersion ?? ''),
-    scannedAt: String(row.scannedAt ?? ''),
-  }))
+  const apps: ExposureApp[] = rows.map((row) => {
+    const scannedAt = String(row.scannedAt ?? '')
+    const withinWindow = Boolean(
+      scannedAt && publishedAt && modifiedAt && scannedAt >= publishedAt && scannedAt <= modifiedAt
+    )
+    return {
+      repository: String(row.repository),
+      lockfile: String(row.lockfile),
+      kind: String(row.kind ?? ''),
+      name: String(row.name),
+      version: String(row.version),
+      ecosystem: String(row.ecosystem ?? ''),
+      requestedVersion: String(row.requestedVersion ?? ''),
+      scannedAt,
+      conclusion: withinWindow ? 'EXPOSED' : 'AT_RISK',
+    }
+  })
 
   const asOfFiltered = asOf ? apps.filter((app) => app.scannedAt && app.scannedAt <= asOf) : apps
 
-  const exposedWhileLive = asOfFiltered.filter(
-    (app) =>
-      app.scannedAt &&
-      publishedAt &&
-      modifiedAt &&
-      app.scannedAt >= publishedAt &&
-      app.scannedAt <= modifiedAt
-  )
-
+  const exposedWhileLive = asOfFiltered.filter((app) => app.conclusion === 'EXPOSED')
   const currentlyAffected = asOfFiltered
 
   return {
@@ -88,6 +95,12 @@ export async function getExposureWindow(
       start: publishedAt,
       end,
       live: Boolean(publishedAt && modifiedAt),
+    },
+    conclusions: {
+      exposed: exposedWhileLive.map((app) => app.repository),
+      atRisk: asOfFiltered
+        .filter((app) => app.conclusion === 'AT_RISK')
+        .map((app) => app.repository),
     },
     exposedWhileLive,
     currentlyAffected,

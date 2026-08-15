@@ -32,4 +32,27 @@ describe('rankCandidates', () => {
     const candidates = rankCandidates('lodash', ['lodash-xyzzy-plugh', 'react'], 0.8)
     expect(candidates).toHaveLength(0)
   })
+
+  it('flags near-identical names as high risk with a reason', () => {
+    const candidates = rankCandidates('lodash', ['lodahs'])
+    const candidate = candidates[0]
+    expect(candidate.editDistance).toBe(2)
+    expect(candidate.factors).toContain('character-substitution')
+    expect(candidate.risk).toBeGreaterThan(0)
+    expect(candidate.reason).toContain('similar')
+  })
+
+  it('detects hyphen insertion and scoped vs unscoped names', () => {
+    const hyphen = rankCandidates('lodash', ['lodash-js'])
+    expect(hyphen[0].factors).toContain('hyphenated')
+
+    const scoped = rankCandidates('lodash', ['@lodash/lodash'])
+    expect(scoped[0].factors).toContain('scoped-vs-unscoped')
+  })
+
+  it('raises risk for low popularity similar names', () => {
+    const obscure = rankCandidates('lodash', [{ name: 'lodashh', popularity: 0.1 }])
+    const popular = rankCandidates('lodash', [{ name: 'lodashh', popularity: 0.9 }])
+    expect(obscure[0].risk).toBeGreaterThan(popular[0].risk)
+  })
 })

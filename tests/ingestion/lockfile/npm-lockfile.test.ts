@@ -20,8 +20,8 @@ describe('parseNpmPackageLock', () => {
     }))
 
     expect(deps).toEqual([
-      { ecosystem: 'npm', name: 'express', requestedVersion: '^5.2.1', resolvedVersion: '5.2.1' },
-      { ecosystem: 'npm', name: 'lodash', requestedVersion: '^4.17.20', resolvedVersion: '4.17.20' },
+      { ecosystem: 'npm', name: 'express', requestedVersion: '^5.2.1', resolvedVersion: '5.2.1', path: 'node_modules/express' },
+      { ecosystem: 'npm', name: 'lodash', requestedVersion: '^4.17.20', resolvedVersion: '4.17.20', path: 'node_modules/lodash' },
     ])
   })
 
@@ -34,8 +34,22 @@ describe('parseNpmPackageLock', () => {
       },
     }))
 
-    expect(deps).toContainEqual({ ecosystem: 'npm', name: 'qs', requestedVersion: undefined, resolvedVersion: '6.5.2' })
-    expect(deps).toContainEqual({ ecosystem: 'npm', name: '@scope/pkg', requestedVersion: undefined, resolvedVersion: '2.0.0' })
+    expect(deps).toContainEqual({ ecosystem: 'npm', name: 'qs', requestedVersion: undefined, resolvedVersion: '6.5.2', path: 'node_modules/express/node_modules/qs' })
+    expect(deps).toContainEqual({ ecosystem: 'npm', name: '@scope/pkg', requestedVersion: undefined, resolvedVersion: '2.0.0', path: 'node_modules/@scope/pkg' })
+  })
+
+  it('keeps distinct versions of the same package at nested paths', () => {
+    const deps = parseNpmPackageLock(JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        'node_modules/foo': { version: '1.2.3' },
+        'node_modules/bar/node_modules/foo': { version: '2.0.0' },
+      },
+    }))
+
+    expect(deps).toHaveLength(2)
+    expect(deps).toContainEqual({ ecosystem: 'npm', name: 'foo', requestedVersion: undefined, resolvedVersion: '1.2.3', path: 'node_modules/foo' })
+    expect(deps).toContainEqual({ ecosystem: 'npm', name: 'foo', requestedVersion: undefined, resolvedVersion: '2.0.0', path: 'node_modules/bar/node_modules/foo' })
   })
 
   it('falls back to the v1/v2 dependencies map', () => {
@@ -47,7 +61,7 @@ describe('parseNpmPackageLock', () => {
     }))
 
     expect(deps).toEqual([
-      { ecosystem: 'npm', name: 'express', requestedVersion: undefined, resolvedVersion: '5.2.1' },
+      { ecosystem: 'npm', name: 'express', requestedVersion: undefined, resolvedVersion: '5.2.1', path: 'node_modules/express' },
     ])
   })
 

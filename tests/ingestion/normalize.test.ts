@@ -49,7 +49,7 @@ describe('normalizePackage (npm)', () => {
     expect(result.maintainerEdges).toHaveLength(2)
   })
 
-  it('collects dependency specs from the latest version', () => {
+  it('collects per-version dependency specs with ranges', () => {
     const rawWithDeps: NpmPackageRaw = {
       ...npmRaw,
       versions: {
@@ -59,7 +59,7 @@ describe('normalizePackage (npm)', () => {
     }
     const result = normalizePackage('npm', rawWithDeps, { pinnedVersions: ['4.17.20'] })
     expect(result.dependencySpecs).toEqual([
-      { source: packageVersionId('npm', 'lodash', '4.17.21'), name: 'ansi-regex' },
+      { source: packageVersionId('npm', 'lodash', '4.17.21'), name: 'ansi-regex', range: '^5.0.0' },
     ])
   })
 })

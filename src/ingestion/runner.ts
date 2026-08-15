@@ -1,11 +1,14 @@
 import { env } from '../lib/config'
 import { fetchAdvisories } from './advisory'
 import { GraphWriter } from './graph-writer'
+import { hydra } from '../hydra/client'
+import { clearDependencyEdgesQuery } from '../hydra/queries'
 import { loadDemoOrg, readLockfile } from './lockfile/demo-org'
 import { parseLockfile } from './lockfile'
 import { normalizePackage } from './normalize'
 import { fetchRegistryPackage, type NpmPackageRaw, type PypiPackageRaw } from './registry'
 import { NPM_SEEDS, PYPI_SEEDS, type SeedPackage } from './seeds'
+import { compareVersions, testNpmRange } from './version'
 import {
   edgeId,
   lockfileId,
@@ -133,17 +136,26 @@ export async function runIngestion(): Promise<void> {
     frontier = nextFrontier
   }
 
+  const versionIdByKey = new Map<string, number>()
+  for (const nodes of versionByPackage.values()) {
+    for (const node of nodes) {
+      versionIdByKey.set(`${node.ecosystem}:${node.name}:${node.version}`, node.id)
+    }
+  }
+
+  const lockfileVersionSets = collectLockfileVersionSets(versionIdByKey)
+  await hydra.query(clearDependencyEdgesQuery, { consistency: 'causal' })
   const dependencyEdges: Edge[] = []
   for (const { ecosystem, spec } of allSpecs) {
     for (const dependency of spec) {
-      const targets = versionByPackage.get(`${ecosystem}:${dependency.name}`) ?? []
-      for (const target of targets) {
-        dependencyEdges.push({
-          id: edgeId('DEPENDS_ON', dependency.source, target.id),
-          source: dependency.source,
-          target: target.id,
-        })
-      }
+      const candidates = versionByPackage.get(`${ecosystem}:${dependency.name}`) ?? []
+      const target = resolveDepTarget(dependency, candidates, lockfileVersionSets, ecosystem)
+      if (!target) continue
+      dependencyEdges.push({
+        id: edgeId('DEPENDS_ON', dependency.source, target.id),
+        source: dependency.source,
+        target: target.id,
+      })
     }
   }
   writer.addEdges('DEPENDS_ON', dependencyEdges)
@@ -155,13 +167,6 @@ export async function runIngestion(): Promise<void> {
   }))
   const advisoryRecords = await fetchAdvisories(advisoryPackages)
   writer.addAdvisories(advisoryRecords.map((record) => record.node))
-
-  const versionIdByKey = new Map<string, number>()
-  for (const nodes of versionByPackage.values()) {
-    for (const node of nodes) {
-      versionIdByKey.set(`${node.ecosystem}:${node.name}:${node.version}`, node.id)
-    }
-  }
 
   const affectedEdges: Edge[] = []
   for (const record of advisoryRecords) {
@@ -199,8 +204,58 @@ export async function runIngestion(): Promise<void> {
   console.log(`  duration:      ${(durationMs / 1000).toFixed(1)}s`)
 }
 
-async function ingestDemoOrg(
-  writer: GraphWriter,
+/**
+ * Collect, per demo-org lockfile, the set of PackageVersion ids it resolves.
+ * Used to ground DEPENDS_ON edges to the exact versions a real lockfile
+ * resolved, instead of fanning out to every known version of a dependency.
+ */
+function collectLockfileVersionSets(versionIdByKey: Map<string, number>): Set<number>[] {
+  const manifest = loadDemoOrg(env.DEMO_ORG_PATH)
+  if (!manifest) return []
+  const sets: Set<number>[] = []
+  for (const repo of manifest.repositories) {
+    for (const lockfile of repo.lockfiles) {
+      const content = readLockfile(env.DEMO_ORG_PATH, lockfile.path)
+      if (!content) continue
+      const deps = parseLockfile(lockfile.path, lockfile.ecosystem, content)
+      const set = new Set<number>()
+      for (const dep of deps) {
+        const id = versionIdByKey.get(`${dep.ecosystem}:${dep.name}:${dep.resolvedVersion}`)
+        if (id !== undefined) set.add(id)
+      }
+      if (set.size > 0) sets.push(set)
+    }
+  }
+  return sets
+}
+
+/**
+ * Resolve a dependency declaration `source -> name` to a single exact target
+ * version, preferring the version a lockfile resolved for the same source.
+ */
+function resolveDepTarget(
+  spec: DependencySpec,
+  candidates: PackageVersionNode[],
+  lockfileSets: Set<number>[],
+  ecosystem: Ecosystem
+): PackageVersionNode | null {
+  if (candidates.length === 0) return null
+
+  for (const set of lockfileSets) {
+    if (!set.has(spec.source)) continue
+    const grounded = candidates.find((candidate) => set.has(candidate.id))
+    if (grounded) return grounded
+  }
+
+  const satisfying =
+    ecosystem === 'npm'
+      ? candidates.filter((candidate) => testNpmRange(spec.range, candidate.version))
+      : candidates
+  if (satisfying.length === 0) return null
+  return [...satisfying].sort((a, b) => compareVersions(b.version, a.version))[0]
+}
+
+async function ingestDemoOrg(  writer: GraphWriter,
   versionIdByKey: Map<string, number>
 ): Promise<void> {
   const manifest = loadDemoOrg(env.DEMO_ORG_PATH)
@@ -260,6 +315,7 @@ async function ingestDemoOrg(
           repository: repo.name,
           commitSha: manifest.commitSha,
           scannedAt: repo.scannedAt,
+          internalPath: dep.path ?? '',
         })
         linked += 1
       }

@@ -28,6 +28,9 @@ import { repoLockfilesQuery, resolutionsForLockfileQuery } from '../hydra/querie
 
 const SUPPORTED_LOCKFILES: Array<{ match: (path: string) => boolean; ecosystem: Ecosystem }> = [
   { match: (path) => path === 'package-lock.json', ecosystem: 'npm' },
+  { match: (path) => path === 'yarn.lock', ecosystem: 'npm' },
+  { match: (path) => path === 'pnpm-lock.yaml', ecosystem: 'npm' },
+  { match: (path) => path === 'bun.lock', ecosystem: 'npm' },
   { match: (path) => path === 'uv.lock', ecosystem: 'PyPI' },
   { match: (path) => /requirements.*\.txt$/i.test(path), ecosystem: 'PyPI' },
 ]
@@ -85,7 +88,7 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
     throw new AppError(
       422,
       'no_supported_lockfile',
-      `${repoLabel} has manifests but no supported lockfile (package-lock.json, uv.lock, or requirements*.txt)`
+      `${repoLabel} has manifests but no supported lockfile (package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lock, uv.lock, requirements*.txt)`
     )
   }
 
@@ -122,6 +125,7 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
         requestedVersion: dep.requestedVersion,
         resolvedVersion: dep.resolvedVersion,
         lockfilePath: file.path,
+        path: dep.path,
       }))
       parsedByFile.set(file.path, { ecosystem, deps })
       for (const dep of deps) {
@@ -170,6 +174,7 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
           repository: repoLabel,
           commitSha: 'HEAD',
           scannedAt,
+          internalPath: dep.path ?? '',
         })
         linked += 1
       }

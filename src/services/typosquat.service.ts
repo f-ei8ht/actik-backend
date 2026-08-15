@@ -7,6 +7,11 @@ interface NpmSearchObject {
     version?: string
     description?: string
   }
+  score?: {
+    detail?: {
+      popularity?: number
+    }
+  }
 }
 
 interface NpmSearchResponse {
@@ -23,6 +28,11 @@ export async function getTyposquatCandidates(target: string): Promise<TyposquatC
     throw new Error(`npm search ${response.status}: ${await response.text()}`)
   }
   const data = (await response.json()) as NpmSearchResponse
-  const names = (data.objects ?? []).map((entry) => entry.package?.name ?? '').filter(Boolean)
-  return rankCandidates(target, names)
+  const candidates = (data.objects ?? []).map((entry) => ({
+    name: entry.package?.name ?? '',
+    version: entry.package?.version ?? '',
+    description: entry.package?.description ?? '',
+    popularity: entry.score?.detail?.popularity ?? 0.5,
+  }))
+  return rankCandidates(target, candidates)
 }

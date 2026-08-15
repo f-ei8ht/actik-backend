@@ -110,25 +110,24 @@ function dependencySpecs(
   raw: NpmPackageRaw | PypiPackageRaw,
   versionNodes: PackageVersionNode[]
 ): DependencySpec[] {
-  if (versionNodes.length === 0) return []
-  const latestVersion = versionNodes.find((node) => node.version === raw.latest) ?? versionNodes[0]
-  const source = latestVersion.id
-  const names = new Set<string>()
-
+  const specs: DependencySpec[] = []
   if ('versions' in raw) {
-    const entry = raw.versions[raw.latest]
-    if (entry) {
-      for (const depName of Object.keys(entry.dependencies ?? {})) {
-        if (depName) names.add(depName)
+    for (const node of versionNodes) {
+      const entry = raw.versions[node.version]
+      if (!entry) continue
+      for (const [depName, range] of Object.entries(entry.dependencies ?? {})) {
+        if (depName) specs.push({ source: node.id, name: depName, range })
       }
     }
   } else {
-    for (const dep of raw.requiresDist) {
-      names.add(dep.name)
+    const latestNode = versionNodes.find((node) => node.version === raw.latest) ?? versionNodes[0]
+    if (latestNode) {
+      for (const dep of raw.requiresDist) {
+        specs.push({ source: latestNode.id, name: dep.name, range: dep.specifier ?? undefined })
+      }
     }
   }
-
-  return [...names].map((name) => ({ source, name }))
+  return specs
 }
 
 export function normalizeAdvisory(doc: OsvVulnDoc): AdvisoryNode {

@@ -8,7 +8,7 @@ export const NPM_SEEDS: SeedPackage[] = [
   { name: 'express' },
   { name: 'qs', versions: ['6.5.2'] },
   { name: 'request' },
-  { name: 'minimist', versions: ['1.2.5'] },
+  { name: 'minimist', versions: ['1.2.5', '0.0.10'] },
   { name: 'optimist' },
   { name: 'yargs' },
   { name: 'yargs-parser', versions: ['13.1.1'] },
