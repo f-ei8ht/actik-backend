@@ -13,6 +13,7 @@ function record(advisoryId: string, affected: AdvisoryRecord['affected']): Advis
       publishedAt: '',
       modifiedAt: '',
       references: '',
+      fixedVersions: '',
     },
     affected,
   }

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const hydraValueSchema = z.union([
-  z.object({ type: z.literal('null'), value: z.null() }),
+  z.object({ type: z.literal('null'), value: z.null().optional() }),
   z.object({ type: z.literal('vertex_id'), value: z.number() }),
   z.object({ type: z.literal('integer'), value: z.number() }),
   z.object({ type: z.literal('signed_integer'), value: z.number() }),

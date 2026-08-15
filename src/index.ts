@@ -12,6 +12,9 @@ import advisories from './routes/advisories'
 import blastRadius from './routes/blast-radius'
 import graph from './routes/graph'
 import health from './routes/health'
+import scan from './routes/scan'
+import simulate from './routes/simulate'
+import watch from './routes/watch'
 
 export const app = new Hono()
 
@@ -33,6 +36,9 @@ app.route('/api/packages', packages)
 app.route('/api/packages', blastRadius)
 app.route('/api/advisories', advisories)
 app.route('/api/graph', graph)
+app.route('/api/scan', scan)
+app.route('/api/simulate', simulate)
+app.route('/api/watch', watch)
 
 app.onError((error, c) => {
   if (error instanceof AppError) {

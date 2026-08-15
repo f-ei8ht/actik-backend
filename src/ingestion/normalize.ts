@@ -16,7 +16,7 @@ import {
   packageId,
   packageVersionId,
 } from './types'
-import { testOsvAffected, type OsvAffected, type OsvVulnDoc } from './version'
+import { firstFixedVersion, testOsvAffected, type OsvAffected, type OsvVulnDoc } from './version'
 
 export interface NormalizeOptions {
   pinnedVersions?: string[]
@@ -132,6 +132,13 @@ function dependencySpecs(
 }
 
 export function normalizeAdvisory(doc: OsvVulnDoc): AdvisoryNode {
+  const fixedVersions: Record<string, string> = {}
+  for (const affected of doc.affected ?? []) {
+    const name = affected.package?.name
+    if (!name) continue
+    const fixed = firstFixedVersion(affected)
+    if (fixed) fixedVersions[name] = fixed
+  }
   return {
     id: advisoryNodeId(doc.id),
     advisoryId: doc.id,
@@ -140,6 +147,7 @@ export function normalizeAdvisory(doc: OsvVulnDoc): AdvisoryNode {
     publishedAt: doc.published ?? '',
     modifiedAt: doc.modified ?? '',
     references: (doc.references ?? []).map((ref) => ref.url ?? '').filter(Boolean).join('\n'),
+    fixedVersions: Object.keys(fixedVersions).length === 0 ? '' : JSON.stringify(fixedVersions),
   }
 }
 

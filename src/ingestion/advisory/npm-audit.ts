@@ -51,6 +51,7 @@ export async function fetchNpmAuditAdvisories(packages: AdvisoryPackage[]): Prom
         publishedAt: '',
         modifiedAt: '',
         references: advisory.url ?? '',
+        fixedVersions: '',
       }
       const versions = packageVersions.filter((version) =>
         testNpmRange(advisory.vulnerable_versions, version)

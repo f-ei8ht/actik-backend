@@ -64,6 +64,10 @@ export async function fetchPypiAdvisories(packages: AdvisoryPackage[]): Promise<
         publishedAt: '',
         modifiedAt: '',
         references: vulnerability.link ?? '',
+        fixedVersions:
+          Array.isArray(vulnerability.fixed_in) && vulnerability.fixed_in.length > 0
+            ? JSON.stringify({ [task.name]: vulnerability.fixed_in[0] })
+            : '',
       }
       records.push({
         node,

@@ -77,6 +77,23 @@ export function versionInRangeEvents(events: OsvRangeEvent[], version: string): 
   return true
 }
 
+/**
+ * First known fixed version for an OSV affected entry, if the ranges carry a
+ * `fixed` event. Used to suggest remediation (e.g. `npm install <pkg>@<fix>`).
+ */
+export function firstFixedVersion(affected: OsvAffected): string | null {
+  const candidates: string[] = []
+  for (const range of affected.ranges ?? []) {
+    for (const event of range.events ?? []) {
+      if (event.fixed) candidates.push(event.fixed)
+    }
+  }
+  if (candidates.length === 0) return null
+  return candidates.reduce((best, candidate) =>
+    compareVersions(candidate, best) < 0 ? candidate : best
+  )
+}
+
 export function testOsvAffected(affected: OsvAffected, version: string): boolean {
   if (Array.isArray(affected.versions) && affected.versions.includes(version)) return true
   if (!Array.isArray(affected.ranges)) return false

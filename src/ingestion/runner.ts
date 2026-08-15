@@ -259,6 +259,7 @@ async function ingestDemoOrg(
           lockfilePath: lockfile.path,
           repository: repo.name,
           commitSha: manifest.commitSha,
+          scannedAt: repo.scannedAt,
         })
         linked += 1
       }

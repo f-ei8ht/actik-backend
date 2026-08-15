@@ -6,30 +6,35 @@
       "name": "payments-api",
       "language": "typescript",
       "kind": "application",
+      "scannedAt": "2021-02-01T10:00:00Z",
       "lockfiles": [{ "path": "payments-api/package-lock.json", "ecosystem": "npm" }]
     },
     {
       "name": "storefront",
       "language": "typescript",
       "kind": "application",
+      "scannedAt": "2021-08-01T10:00:00Z",
       "lockfiles": [{ "path": "storefront/package-lock.json", "ecosystem": "npm" }]
     },
     {
       "name": "notification-service",
       "language": "typescript",
       "kind": "service",
+      "scannedAt": "2022-01-01T10:00:00Z",
       "lockfiles": [{ "path": "notification-service/package-lock.json", "ecosystem": "npm" }]
     },
     {
       "name": "analytics-worker",
       "language": "python",
       "kind": "worker",
+      "scannedAt": "2023-06-01T10:00:00Z",
       "lockfiles": [{ "path": "analytics-worker/uv.lock", "ecosystem": "PyPI" }]
     },
     {
       "name": "recommendation-service",
       "language": "python",
       "kind": "service",
+      "scannedAt": "2023-09-01T10:00:00Z",
       "lockfiles": [{ "path": "recommendation-service/requirements.txt", "ecosystem": "PyPI" }]
     }
   ]

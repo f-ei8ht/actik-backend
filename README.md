@@ -3,6 +3,28 @@
 Hono + TypeScript backend, running on Bun, with a self-hosted HydraDB
 `graph-node` alongside it in Docker Compose.
 
+## Why HydraDB?
+
+actik's whole pitch is *graph-native supply-chain defense*. Every feature in
+this repo leans on a single graph of ~100k nodes and edges stored in HydraDB:
+
+- **Blast radius** is `algo.SSPaths` over `DEPENDS_ON` edges — a traversal that
+  a relational DB answers with recursive CTEs and a vector DB cannot answer at
+  all.
+- **Repo scanner** (`POST /api/scan`) writes `Repository → HAS_LOCKFILE →
+  Lockfile → RESOLVES → PackageVersion` into the graph, then answers "which
+  resolved versions have advisories?" with a single `AFFECTED_BY` join.
+- **Exposure score** re-traverses the same graph after each proposed fix to
+  prove the fix clears the blast radius.
+- **Time travel** (`GET /api/advisories/:id/exposure-window?asOf=`) answers the
+  track's hardest question — *"which applications resolved the compromised
+  version while it was live?"* — by reading `scanned_at` on `RESOLVES` edges
+  and `published_at`/`modified_at` on advisories. That's a temporal predicate
+  over graph edges; no other store in this problem has the shape for it.
+
+Everything the API returns (paths, chains, exposure windows) is produced by
+traversing the graph, not by querying a table.
+
 ## Local development (without Docker)
 
 ```sh
@@ -99,5 +121,67 @@ query parameter to disambiguate packages that share a name across ecosystems.
 | `GET /api/packages/:name/:version/dependents` | Direct dependents |
 | `GET /api/packages/:name/:version/blast-radius` | Direct/transitive dependents, max depth, paths, latency, affected repositories + resolution evidence |
 | `GET /api/packages/:name/:version/graph` | Dependency neighborhood (for React Flow), incl. resolving repositories |
-| `GET /api/advisories/:id` | Advisory details + affected versions |
+| `GET /api/advisories/:id` | Advisory details + affected versions + known fixed versions |
+| `GET /api/advisories/:id/exposure-window` | Apps that resolved an affected version **while the advisory was live** (`scanned_at` within `[published_at, modified_at]`); optional `?asOf=YYYY-MM-DD` snapshot |
 | `GET /api/graph/:name/:version` | Same as `.../graph` (alias) |
+| `POST /api/scan` | Scan a GitHub repo (`{"repo":"owner/name"}`): fetch manifests, resolve exact versions, write into the graph, return exposure score + findings + fixes + minimal-fix set |
+| `GET /api/scan/:owner/:name` | Re-run analysis for a previously scanned repo from the graph (no re-fetch) |
+| `GET /api/simulate/propagation/:name/:version` | Worm simulation: compromise a package at `?compromisedAt=`, compute each app's time-to-exposure from DEPENDS_ON depth (`?perHopMs=`, default 6 min) |
+| `POST /api/watch/run` | Live-watch pass: poll OSV for every scanned/resolved version, record newly-flagged advisories as Alert nodes with `first_seen_at` |
+| `GET /api/watch/status` | Last live-watch run summary |
+| `GET /api/watch/incidents` | Recent incidents, each with its exposure path (`repo → lockfile → pkg@version → advisory`) |
+
+### Scanner
+
+`POST /api/scan` pulls `package-lock.json`, `uv.lock` or `requirements*.txt`
+straight from `raw.githubusercontent.com` (no clone, no token), parses the
+exact resolved versions, upserts the repo into HydraDB, and returns:
+
+- an **exposure score** (0–100) weighted by severity × count,
+- each vulnerable package with its advisory, the **exact fix** (e.g.
+  `npm install lodash@4.17.21`) sourced from the advisory's known fixed
+  versions, and
+- the **exposure path** from the app through the dependency chain.
+
+The scan also returns a **minimal-fix set** — the fewest package upgrades that
+clear every finding, each one *verified* by re-traversing HydraDB: the target
+version must exist in the graph and resolve to zero advisories.
+
+Findings are merged from two sources: `AFFECTED_BY` edges already in HydraDB
+(`source: "graph"`) and a live Google OSV check against every resolved version
+(`source: "osv"`), so a scan is useful on *any* lockfile, not just seeded
+packages.
+
+Resolved versions that aren't in the ingested graph are reported as
+`unlinked`, so coverage is transparent.
+
+### Time travel
+
+`GET /api/advisories/:id/exposure-window` partitions the apps resolving an
+affected version into:
+
+- `exposedWhileLive` — apps whose scan happened **during** the advisory's
+  `[published_at, modified_at]` window (the track's "09:00 compromised →
+  09:06 exposed" scenario),
+- `currentlyAffected` — every app still resolving an affected version.
+
+Pass `?asOf=2026-05-14` to treat the graph as it was at that date (only
+`RESOLVES` edges scanned up to then are considered).
+
+### Propagation simulation (worm spread)
+
+`GET /api/simulate/propagation/lodash/4.17.20?compromisedAt=2026-05-14T09:00:00Z&perHopMs=360000`
+compromises a package at `t=0` and walks the reverse `DEPENDS_ON` closure. For
+every app that resolves a reachable version it computes
+`exposedAt = compromisedAt + depth × perHopMs`, where `depth` is the shortest
+chain from the app's resolved version to the compromised one. Defaults to the
+track's "09:00 compromised → 09:06 exposed" cadence.
+
+### Live watch
+
+`POST /api/watch/run` polls Google OSV for every version a scanned app resolves
+and compares against what's already in the graph. Newly-flagged advisories
+become `Alert` nodes (keyed by `advisory:version`, so `first_seen_at` is only
+set once) with `ALERTS_ON` edges to the affected `PackageVersion` and
+`EXPOSES` edges to every `Lockfile` that resolves it.
+`GET /api/watch/incidents` lists them newest-first with their exposure path.

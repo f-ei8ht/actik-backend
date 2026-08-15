@@ -14,7 +14,17 @@ export interface AdvisoryDetails {
   publishedAt: string
   modifiedAt: string
   references: string
+  fixedVersions: Record<string, string>
   affectedVersions: VersionDetails[]
+}
+
+function decodeFixedVersions(value: unknown): Record<string, string> {
+  if (typeof value !== 'string' || value === '') return {}
+  try {
+    return JSON.parse(value) as Record<string, string>
+  } catch {
+    return {}
+  }
 }
 
 export async function getAdvisory(id: string): Promise<AdvisoryDetails> {
@@ -37,6 +47,7 @@ export async function getAdvisory(id: string): Promise<AdvisoryDetails> {
     publishedAt: String(rows[0].publishedAt ?? ''),
     modifiedAt: String(rows[0].modifiedAt ?? ''),
     references: String(rows[0].references ?? ''),
+    fixedVersions: decodeFixedVersions(rows[0].fixedVersions),
     affectedVersions: affectedRows.map((row) => ({
       name: String(row.name),
       version: String(row.version),
@@ -60,9 +71,10 @@ export async function getAdvisoriesForVersion(
     id: String(row.id),
     severity: String(row.severity),
     summary: String(row.summary),
-    publishedAt: '',
-    modifiedAt: '',
+    publishedAt: String(row.publishedAt ?? ''),
+    modifiedAt: String(row.modifiedAt ?? ''),
     references: '',
+    fixedVersions: decodeFixedVersions(row.fixedVersions),
     affectedVersions: [],
   }))
 }

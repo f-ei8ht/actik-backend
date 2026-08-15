@@ -90,7 +90,8 @@ export const advisoryByIdQuery = `
 MATCH (a:Advisory)
 WHERE a.advisory_id = $id
 RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary,
-  a.published_at AS publishedAt, a.modified_at AS modifiedAt, a.references AS references
+  a.published_at AS publishedAt, a.modified_at AS modifiedAt, a.references AS references,
+  a.fixed_versions AS fixedVersions
 `
 
 export const advisoryAffectedVersionsQuery = `
@@ -103,7 +104,8 @@ ORDER BY v.name, v.version
 export const advisoriesForVersionQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)-[:AFFECTED_BY]->(a:Advisory)
 WHERE v.name = $name AND v.version = $version${withEcosystem('v', ecosystem)}
-RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary
+RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary,
+  a.published_at AS publishedAt, a.modified_at AS modifiedAt, a.fixed_versions AS fixedVersions
 ORDER BY a.severity
 `
 
@@ -144,7 +146,8 @@ SET v:Advisory,
   v.summary = n.summary,
   v.published_at = n.publishedAt,
   v.modified_at = n.modifiedAt,
-  v.references = n.references
+  v.references = n.references,
+  v.fixed_versions = n.fixedVersions
 `
 
 export const upsertOrganizationNodesQuery = `
@@ -182,6 +185,13 @@ RETURN l.repository AS repository, l.path AS lockfile, l.commit_sha AS commitSha
 ORDER BY l.repository, l.path
 `
 
+export const resolutionsForVersionIdQuery = `
+MATCH (l:Lockfile)-[r:RESOLVES]->(v:PackageVersion {id: $id})
+RETURN l.repository AS repository, l.path AS lockfile, l.kind AS kind,
+  v.id AS versionId, v.name AS name, v.version AS version
+ORDER BY l.repository, l.path
+`
+
 export const reposByVersionIdQuery = `
 MATCH (l:Lockfile)-[:RESOLVES]->(v:PackageVersion)
 WHERE v.id = $id
@@ -195,6 +205,80 @@ MATCH (s:${sourceLabel} {id: e.source}), (t:${targetLabel} {id: e.target})
 MERGE (s)-[r:${type} {id: e.id}]->(t)
 `
 
+export const advisoriesForVersionIdQuery = `
+MATCH (v:PackageVersion {id: $id})
+OPTIONAL MATCH (v)-[:AFFECTED_BY]->(a:Advisory)
+RETURN v.id AS versionId, v.name AS name, v.version AS version, v.ecosystem AS ecosystem,
+  a.advisory_id AS advisoryId, a.severity AS severity, a.summary AS summary,
+  a.published_at AS publishedAt, a.modified_at AS modifiedAt, a.fixed_versions AS fixedVersions
+`
+
+export const versionAdvisoryCountQuery = `
+MATCH (v:PackageVersion {id: $id})
+OPTIONAL MATCH (v)-[:AFFECTED_BY]->(a:Advisory)
+RETURN v.id AS id, count(*) AS count
+`
+
+export const repoLockfilesQuery = `
+MATCH (l:Lockfile)
+WHERE l.repository = $repo
+RETURN l.id AS id, l.path AS path, l.ecosystem AS ecosystem, l.kind AS kind, l.commit_sha AS commitSha
+ORDER BY l.path
+`
+
+export const resolutionsForLockfileQuery = `
+MATCH (l:Lockfile {id: $id})-[r:RESOLVES]->(v:PackageVersion)
+RETURN l.repository AS repository, l.path AS lockfile, v.name AS name, v.version AS version,
+  v.ecosystem AS ecosystem, r.requested_version AS requestedVersion,
+  r.resolved_version AS resolvedVersion, r.scanned_at AS scannedAt
+ORDER BY v.name, v.version
+`
+
+export const distinctResolvedVersionsQuery = `
+MATCH (l:Lockfile)-[r:RESOLVES]->(v:PackageVersion)
+RETURN DISTINCT v.id AS versionId, v.name AS name, v.version AS version, v.ecosystem AS ecosystem
+`
+
+export const upsertAlertNodesQuery = `
+UNWIND $nodes AS n
+MERGE (v {id: n.id})
+SET v:Alert,
+  v.advisory_id = n.advisoryId,
+  v.severity = n.severity,
+  v.summary = n.summary,
+  v.package = n.package,
+  v.version = n.version,
+  v.ecosystem = n.ecosystem,
+  v.fixed_versions = n.fixedVersions,
+  v.first_seen_at = n.firstSeenAt
+`
+
+export const existingAlertKeysQuery = `
+MATCH (a:Alert)
+RETURN a.advisory_id AS advisoryId, a.package AS package, a.version AS version
+`
+
+export const recentIncidentsQuery = `
+MATCH (a:Alert)
+OPTIONAL MATCH (a)-[:EXPOSES]->(l:Lockfile)
+RETURN a.advisory_id AS advisoryId, a.severity AS severity, a.summary AS summary,
+  a.package AS package, a.version AS version, a.ecosystem AS ecosystem,
+  a.fixed_versions AS fixedVersions, a.first_seen_at AS firstSeenAt,
+  l.repository AS repository, l.path AS lockfile
+ORDER BY a.first_seen_at DESC
+`
+
+export const exposureWindowForAdvisoryQuery = `
+MATCH (l:Lockfile)-[r:RESOLVES]->(v:PackageVersion)-[:AFFECTED_BY]->(a:Advisory)
+WHERE a.advisory_id = $id
+RETURN a.advisory_id AS advisoryId, a.severity AS severity, a.summary AS summary,
+  l.repository AS repository, l.path AS lockfile, l.kind AS kind,
+  v.name AS name, v.version AS version, v.ecosystem AS ecosystem,
+  r.requested_version AS requestedVersion, r.scanned_at AS scannedAt,
+  a.published_at AS publishedAt, a.modified_at AS modifiedAt
+ORDER BY l.repository, l.path
+`
+
 export const upsertResolvesEdgesQuery = `
 UNWIND $edges AS e
 MATCH (s:Lockfile {id: e.source}), (t:PackageVersion {id: e.target})
@@ -203,5 +287,6 @@ SET r.requested_version = e.requestedVersion,
     r.resolved_version = e.resolvedVersion,
     r.lockfile_path = e.lockfilePath,
     r.repository = e.repository,
-    r.commit_sha = e.commitSha
+    r.commit_sha = e.commitSha,
+    r.scanned_at = e.scannedAt
 `

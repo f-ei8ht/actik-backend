@@ -28,6 +28,8 @@ export interface AdvisoryNode {
   publishedAt: string
   modifiedAt: string
   references: string
+  /** JSON-encoded map of package name -> first known fixed version */
+  fixedVersions: string
 }
 
 export interface OrganizationNode {
@@ -69,6 +71,7 @@ export interface DemoRepo {
   language: string
   kind: string
   lockfiles: RepoLockfileRef[]
+  scannedAt?: string
 }
 
 export interface DemoOrgManifest {
@@ -83,6 +86,7 @@ export interface ResolvesEdge extends Edge {
   lockfilePath: string
   repository: string
   commitSha: string
+  scannedAt?: string
 }
 
 export interface Edge {
