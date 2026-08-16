@@ -92,7 +92,16 @@ range*, and the internal `node_modules` path as evidence.
 
 ```sh
 cp .env.example .env
-bun run ingest   # or: docker compose exec api bun run ingest
+docker compose up -d --build
+```
+
+The API **auto-seeds on startup**: if HydraDB has an empty package graph it
+runs the full ingestion pipeline before serving (fast-restart skips it when
+already seeded). No manual `bun run ingest` needed. The command stays
+available for a manual refresh:
+
+```sh
+docker compose exec api bun run ingest
 ```
 
 All endpoints and limits come from env vars in `.env.example`
@@ -130,7 +139,7 @@ query parameter to disambiguate packages that share a name across ecosystems.
 | `GET /api/advisories/:id` | Advisory details + affected versions + known fixed versions |
 | `GET /api/advisories/:id/exposure-window` | Apps that resolved an affected version **while the advisory was live** (`scanned_at` within `[published_at, modified_at]`) with a per-app **`EXPOSED` / `AT_RISK` conclusion**; optional `?asOf=YYYY-MM-DD` snapshot |
 | `GET /api/graph/:name/:version` | Same as `.../graph` (alias) |
-| `POST /api/scan` | Scan a GitHub repo (`{"repo":"owner/name"}`): fetch manifests, resolve exact versions, write into the graph, return exposure score + findings + fixes + minimal-fix set |
+| `POST /api/scan` | Scan a repository (`{"repo":"owner/name"}` or a full GitHub/GitLab/Bitbucket/Codeberg URL): fetch manifests, resolve exact versions, write into the graph, return exposure score + findings + fixes + minimal-fix set |
 | `GET /api/scan/:owner/:name` | Re-run analysis for a previously scanned repo from the graph (no re-fetch) |
 | `GET /api/simulate/propagation/:name/:version` | Worm simulation: compromise a package at `?compromisedAt=`, compute each app's time-to-exposure from DEPENDS_ON depth (`?perHopMs=`, default 6 min) |
 | `GET /api/investigate/:ecosystem/:name/:version` | One-call investigation: version details + advisories + blast radius + **maintainer risk** (maintainers → other packages → repositories) + typosquats + recommendations |
@@ -141,10 +150,12 @@ query parameter to disambiguate packages that share a name across ecosystems.
 ### Scanner
 
 `POST /api/scan` pulls `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`,
-`bun.lock`, `uv.lock` or `requirements*.txt` straight from
-`raw.githubusercontent.com` (no clone, no token), parses the exact resolved
-versions (including nested `node_modules` resolutions), upserts the repo into
-HydraDB, and returns:
+`bun.lock`, `uv.lock` or `requirements*.txt` straight from the repository
+(no clone, no token) across **GitHub, GitLab, Bitbucket and Codeberg** — the
+default branch is resolved via each host's API (falling back to `HEAD`), then
+manifests are fetched over raw URLs. It parses the exact resolved versions
+(including nested `node_modules` resolutions), upserts the repo into HydraDB,
+and returns:
 
 - an **exposure score** (0–100) weighted by severity × count,
 - each vulnerable package with its advisory, the **exact fix** (e.g.

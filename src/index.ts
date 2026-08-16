@@ -16,6 +16,7 @@ import investigate from './routes/investigate'
 import scan from './routes/scan'
 import simulate from './routes/simulate'
 import watch from './routes/watch'
+import { ensureSeeded } from './ingestion/seed'
 
 export const app = new Hono()
 
@@ -59,6 +60,10 @@ app.onError((error, c) => {
 })
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'route not found' } }, 404))
+
+if (import.meta.main) {
+  await ensureSeeded()
+}
 
 export default {
   port: 8000,

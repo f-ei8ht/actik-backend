@@ -21,7 +21,13 @@ import {
   type RepositoryNode,
   type ResolvesEdge,
 } from '../ingestion/types'
-import { fetchManifestBundle, parseRepo, type ManifestBundle, type RawFile } from '../lib/github'
+import {
+  fetchManifestBundle,
+  parseRepo,
+  repoLabel,
+  type ManifestBundle,
+  type RawFile,
+} from '../lib/vcs'
 import { AppError } from '../lib/errors'
 import { hydra, rowsToObjects } from '../hydra/client'
 import { repoLockfilesQuery, resolutionsForLockfileQuery } from '../hydra/queries'
@@ -80,7 +86,8 @@ function parseableFiles(bundle: ManifestBundle): RawFile[] {
 export async function scanRepository(repoInput: string): Promise<ScanResult> {
   const startedAt = performance.now()
   const repo = parseRepo(repoInput)
-  const repoLabel = `${repo.owner}/${repo.name}`
+  const org = repo.host === 'github' ? repo.owner : `${repo.host}/${repo.owner}`
+  const label = repoLabel(repo)
   const bundle = await fetchManifestBundle(repo)
 
   const parseable = parseableFiles(bundle)
@@ -88,7 +95,7 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
     throw new AppError(
       422,
       'no_supported_lockfile',
-      `${repoLabel} has manifests but no supported lockfile (package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lock, uv.lock, requirements*.txt)`
+      `${label} has manifests but no supported lockfile (package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lock, uv.lock, requirements*.txt)`
     )
   }
 
@@ -96,9 +103,9 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
   const scannedAt = bundle.scannedAt
 
   const repoNode: RepositoryNode = {
-    id: repositoryId(repo.owner, repo.name),
+    id: repositoryId(org, repo.name),
     name: repo.name,
-    org: repo.owner,
+    org,
     language: detectLanguage(bundle),
     kind: 'application',
   }
@@ -144,12 +151,12 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
   const allDeps: ResolvedDepRef[] = []
 
   for (const [path, { ecosystem, deps }] of parsedByFile) {
-    const lockId = lockfileId(repoLabel, path)
+    const lockId = lockfileId(label, path)
     const lockNode: LockfileNode = {
       id: lockId,
       path,
       ecosystem,
-      repository: repoLabel,
+      repository: label,
       commitSha: 'HEAD',
       kind: 'application',
     }
@@ -171,7 +178,7 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
           requestedVersion: dep.requestedVersion ?? '',
           resolvedVersion: dep.resolvedVersion,
           lockfilePath: path,
-          repository: repoLabel,
+          repository: label,
           commitSha: 'HEAD',
           scannedAt,
           internalPath: dep.path ?? '',
@@ -193,13 +200,13 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
   writer.addEdges('RESOLVES', resolvesEdges)
   await writer.flush()
 
-  const graphExposure = await analyzeExposure(allDeps, repoLabel)
+  const graphExposure = await analyzeExposure(allDeps, label)
   const skipKeys = new Set(
     graphExposure.findings.map(
       (finding) => `${finding.advisory.id}:${finding.package}@${finding.resolvedVersion}`
     )
   )
-  const osvFindings = await fetchOsvFindings(allDeps, repoLabel, skipKeys)
+  const osvFindings = await fetchOsvFindings(allDeps, label, skipKeys)
   const mergedFindings = [...graphExposure.findings, ...osvFindings]
 
   const totalResolved = new Set(
@@ -215,7 +222,7 @@ export async function scanRepository(repoInput: string): Promise<ScanResult> {
   const latencyMs = Math.round(performance.now() - startedAt)
 
   return {
-    repo: { owner: repo.owner, name: repo.name, label: repoLabel, scannedAt },
+    repo: { owner: repo.owner, name: repo.name, label: label, scannedAt },
     lockfiles: lockfiles.sort((a, b) => a.path.localeCompare(b.path)),
     exposure,
     fixSet,
@@ -241,16 +248,16 @@ async function findExistingVersionIds(ids: number[]): Promise<Set<number>> {
 
 export async function analyzeRepository(owner: string, name: string): Promise<ScanResult> {
   const startedAt = performance.now()
-  const repoLabel = `${owner}/${name}`
+  const label = `${owner}/${name}`
 
   const rows = rowsToObjects(
     await hydra.query(repoLockfilesQuery, {
-      parameters: { repo: repoLabel },
+      parameters: { repo: label },
       consistency: 'causal',
     })
   )
   if (rows.length === 0) {
-    throw new AppError(404, 'repo_not_scanned', `${repoLabel} has not been scanned`)
+    throw new AppError(404, 'repo_not_scanned', `${label} has not been scanned`)
   }
 
   const deps: ResolvedDepRef[] = []
@@ -280,13 +287,13 @@ export async function analyzeRepository(owner: string, name: string): Promise<Sc
     lockfiles.push({ path, ecosystem, status: 'ok', resolved: resolutionRows.length, linked: resolutionRows.length })
   }
 
-  const graphExposure = await analyzeExposure(deps, repoLabel)
+  const graphExposure = await analyzeExposure(deps, label)
   const skipKeys = new Set(
     graphExposure.findings.map(
       (finding) => `${finding.advisory.id}:${finding.package}@${finding.resolvedVersion}`
     )
   )
-  const osvFindings = await fetchOsvFindings(deps, repoLabel, skipKeys)
+  const osvFindings = await fetchOsvFindings(deps, label, skipKeys)
   const mergedFindings = [...graphExposure.findings, ...osvFindings]
   const totalResolved = new Set(
     deps.map((dep) => `${dep.ecosystem}:${dep.name}@${dep.resolvedVersion}`)
@@ -304,7 +311,7 @@ export async function analyzeRepository(owner: string, name: string): Promise<Sc
     repo: {
       owner,
       name,
-      label: repoLabel,
+      label: label,
       scannedAt: lastScannedAt,
     },
     lockfiles,
