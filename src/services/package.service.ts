@@ -3,6 +3,7 @@ import {
   advisoryCountForPackageQuery,
   dependenciesQuery,
   dependentsQuery,
+  listPackagesQuery,
   packageByNameQuery,
   versionCountQuery,
   versionDetailsQuery,
@@ -15,6 +16,28 @@ export interface PackageOverview {
   ecosystem: string
   versions: number
   advisories: number
+}
+
+export interface GraphPackage {
+  name: string
+  ecosystem: string
+  versions: number
+}
+
+export async function listPackages(ecosystem?: string): Promise<GraphPackage[]> {
+  const rows = rowsToObjects(
+    await hydra.query(listPackagesQuery(ecosystem), {
+      parameters: ecosystem ? { ecosystem } : {},
+      consistency: 'causal',
+    })
+  )
+  return rows
+    .map((row) => ({
+      name: String(row.name),
+      ecosystem: String(row.ecosystem),
+      versions: Number(row.versions),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export interface VersionDetails {

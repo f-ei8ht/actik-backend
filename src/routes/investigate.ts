@@ -16,10 +16,21 @@ app.get('/:ecosystem/:name/:version', async (c) => {
   return c.json(await investigate(name, version, ecosystem as Ecosystem))
 })
 
+app.get('/:ecosystem/:name', async (c) => {
+  const ecosystem = ecosystemSchema.parse(c.req.param('ecosystem'))
+  const name = nameSchema.parse(c.req.param('name'))
+  return c.json(await investigate(name, '', ecosystem as Ecosystem))
+})
+
 app.get('/:name/:version', async (c) => {
   const name = nameSchema.parse(c.req.param('name'))
   const version = versionSchema.parse(c.req.param('version'))
   return c.json(await investigate(name, version))
+})
+
+app.get('/:name', async (c) => {
+  const name = nameSchema.parse(c.req.param('name'))
+  return c.json(await investigate(name, ''))
 })
 
 export default app

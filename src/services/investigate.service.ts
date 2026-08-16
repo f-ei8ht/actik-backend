@@ -1,9 +1,12 @@
 import { computeBlastRadius } from '../analysis/blast-radius'
+import { fetchOsvFindings } from '../analysis/osv-findings'
 import { getAdvisoriesForVersion } from './advisory.service'
 import { getMaintainerRisk, getSharedMaintainers } from './maintainer.service'
 import { getTyposquatCandidates } from './typosquat.service'
-import { getVersionDetails } from './package.service'
+import { getVersionDetails, listVersions } from './package.service'
+import { compareVersions } from '../ingestion/version'
 import type { Ecosystem } from '../ingestion/types'
+import type { ScanFinding } from '../analysis/exposure'
 
 export interface InvestigateResult {
   package: string
@@ -18,25 +21,81 @@ export interface InvestigateResult {
   recommendations: string[]
 }
 
+const EMPTY_RISK = {
+  package: '',
+  ecosystem: '',
+  maintainers: [] as string[],
+  controlledPackages: [] as Awaited<ReturnType<typeof getMaintainerRisk>>['controlledPackages'],
+  totalPackages: 0,
+  presentInRepositories: 0,
+}
+
+function osvToAdvisory(finding: ScanFinding) {
+  return {
+    id: finding.advisory.id,
+    severity: finding.severity,
+    summary: finding.advisory.summary,
+    publishedAt: finding.advisory.publishedAt,
+    modifiedAt: finding.advisory.modifiedAt,
+    references: finding.advisory.references,
+    fixedVersions: finding.fixedVersion
+      ? { [finding.package]: finding.fixedVersion }
+      : {},
+    affectedVersions: [],
+  }
+}
+
 /**
- * The single entry point for a security investigation of a package version:
- * advisories, blast radius, affected repositories, maintainer reach, typo
- * squats and remediation — everything the frontend needs in one call.
+ * One-call investigation for a package version. Graph-backed parts (blast
+ * radius, maintainers) degrade gracefully when the package isn't in the
+ * ingested graph; advisories always fall back to a live Google OSV check so
+ * any version can be investigated.
  */
 export async function investigate(
   name: string,
   version: string,
   ecosystem?: Ecosystem
 ): Promise<InvestigateResult> {
-  const [versionDetails, advisories, blastRadius, maintainerRisk, sharedMaintainers, typosquats] =
+  if (!version) {
+    const versions = await listVersions(name, ecosystem)
+    const sorted = versions.sort((a, b) => compareVersions(b, a))
+    for (const candidate of sorted) {
+      const advisories = await getAdvisoriesForVersion(name, candidate, ecosystem).catch(() => [])
+      if (advisories.length > 0) {
+        version = candidate
+        break
+      }
+    }
+    if (!version) version = sorted[0] ?? ''
+  }
+
+  let versionDetails: InvestigateResult['versionDetails']
+  try {
+    versionDetails = await getVersionDetails(name, version, ecosystem)
+  } catch {
+    versionDetails = { name, version, ecosystem: ecosystem ?? '' }
+  }
+
+  const [graphAdvisories, osvFindings, blastRadius, maintainerRisk, sharedMaintainers, typosquats] =
     await Promise.all([
-      getVersionDetails(name, version, ecosystem),
-      getAdvisoriesForVersion(name, version, ecosystem),
-      computeBlastRadius(name, version, ecosystem),
-      getMaintainerRisk(name, ecosystem),
-      getSharedMaintainers(name, ecosystem),
+      getAdvisoriesForVersion(name, version, ecosystem).catch(() => []),
+      fetchOsvFindings(
+        [{ ecosystem: ecosystem ?? 'npm', name, resolvedVersion: version, lockfilePath: '' }],
+        name
+      ),
+      computeBlastRadius(name, version, ecosystem).catch(() => null),
+      getMaintainerRisk(name, ecosystem).catch(() => EMPTY_RISK),
+      getSharedMaintainers(name, ecosystem).catch(() => []),
       getTyposquatCandidates(name),
     ])
+
+  const seen = new Set(graphAdvisories.map((advisory) => advisory.id))
+  const advisories = [
+    ...graphAdvisories,
+    ...osvFindings
+      .filter((finding) => !seen.has(finding.advisory.id))
+      .map(osvToAdvisory),
+  ]
 
   const recommendations: string[] = []
   for (const advisory of advisories) {
@@ -44,7 +103,7 @@ export async function investigate(
     recommendations.push(
       fix
         ? `Upgrade ${name} ${version} -> ${fix} (${advisory.id})`
-        : `Review advisory ${advisory.id} — no known fixed version`
+        : `Review advisory ${advisory.id}: no known fixed version`
     )
   }
   if (blastRadius && blastRadius.affectedRepositories.length > 0) {
@@ -57,7 +116,7 @@ export async function investigate(
       `Maintainer reach: ${maintainerRisk.presentInRepositories} of ${maintainerRisk.totalPackages} shared-maintainer package(s) appear in repositories`
     )
   }
-  const strongTyposquat = typosquats.filter((candidate) => (candidate.similarity ?? 0) >= 0.9)
+  const strongTyposquat = typosquats.filter((candidate) => candidate.risk >= 60)
   if (strongTyposquat.length > 0) {
     recommendations.push(`Possible typosquats nearby: ${strongTyposquat.map((c) => c.name).join(', ')}`)
   }

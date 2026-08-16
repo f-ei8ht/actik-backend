@@ -42,6 +42,12 @@ WHERE p.name = $name${withEcosystem('p', ecosystem)}
 RETURN p.name AS name, p.ecosystem AS ecosystem
 `
 
+export const listPackagesQuery = (ecosystem?: string) => `
+MATCH (p:Package)-[:HAS_VERSION]->(v:PackageVersion)
+${ecosystem ? 'WHERE p.ecosystem = $ecosystem' : ''}
+RETURN p.name AS name, p.ecosystem AS ecosystem, count(*) AS versions
+`
+
 export const versionsOfPackageQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)
 WHERE v.name = $name${withEcosystem('v', ecosystem)}

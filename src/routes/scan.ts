@@ -4,7 +4,7 @@ import { analyzeRepository, scanRepository } from '../services/scan.service'
 
 const app = new Hono()
 
-const repoSchema = z.string().min(3).max(200).regex(/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/)
+const repoSchema = z.string().trim().min(3).max(500)
 const nameSchema = z.string().min(1).max(100).regex(/^[a-zA-Z0-9._-]+$/)
 
 app.post('/', async (c) => {
@@ -12,7 +12,7 @@ app.post('/', async (c) => {
   const repo = repoSchema.safeParse(body.repo)
   if (!repo.success) {
     return c.json(
-      { error: { code: 'invalid_repo', message: 'expected {"repo": "owner/repo"}' } },
+      { error: { code: 'invalid_repo', message: 'expected {"repo": "owner/repo"} or a repository URL' } },
       400
     )
   }

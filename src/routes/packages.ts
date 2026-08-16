@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { getDependencyGraph } from '../services/graph.service'
 import { getMaintainers, getSharedMaintainers } from '../services/maintainer.service'
-import { listVersions, getPackageOverview, getVersionDetails, getVersionRelationships } from '../services/package.service'
+import { listVersions, getPackageOverview, getVersionDetails, getVersionRelationships, listPackages } from '../services/package.service'
 import { getAdvisoriesForVersion } from '../services/advisory.service'
 import { getTyposquatCandidates } from '../services/typosquat.service'
 import type { Ecosystem } from '../ingestion/types'
@@ -17,6 +17,12 @@ function ecosystemParam(c: Context): Ecosystem | undefined {
   const raw = c.req.query('ecosystem')
   return raw ? ecosystemSchema.parse(raw) : undefined
 }
+
+app.get('/', async (c) => {
+  const ecosystem = ecosystemParam(c)
+  const packages = await listPackages(ecosystem)
+  return c.json({ count: packages.length, packages })
+})
 
 app.get('/:name', async (c) => {
   const name = nameSchema.parse(c.req.param('name'))
