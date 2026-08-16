@@ -56,11 +56,28 @@ compose `entrypoint` creates it on first start, so there is no manual setup.
 ```sh
 cp .env.example .env
 # set HYDRADB_AUTH_TOKEN to a real value (>= 32 chars)
+# set FRONTEND_ORIGIN to the frontend's public origin (e.g. https://actik.xyz)
 docker compose -f compose.prod.yml up -d --build
 ```
 
-In prod only the API port 8000 is published. HydraDB (8443/7687/9090) stays on
-the internal compose network; the API reaches it at `http://hydradb:8443`.
+That single command is the whole deploy. What happens automatically:
+
+1. `nginx` starts with a throwaway self-signed cert (baked into its entrypoint)
+   so it can serve the ACME challenge before Let's Encrypt has issued anything.
+2. `certbot` runs right after and issues a real Let's Encrypt certificate for
+   `api.actik.xyz` (email default `saif7862254j@gmail.com`, override with
+   `CERTBOT_EMAIL` in `.env`).
+3. nginx detects the cert change and reloads itself — no manual step.
+
+Only **nginx publishes ports (80/443)**. The API and HydraDB have no published
+ports and are only reachable on the internal compose network — nginx proxies
+`https://api.actik.xyz` → `http://api:8000`. HydraDB (8443/7687/9090) stays
+internal; the API reaches it at `http://hydradb:8443`.
+
+Nginx config lives in `proxy/nginx.conf` and the entrypoint in
+`compose.prod.yml`; change `api.actik.xyz` in both if your API hostname
+differs. To renew certs (valid 90 days, auto-renewed each `up` because certbot
+uses `--keep-until-expiring`), just re-run `docker compose -f compose.prod.yml up -d`.
 
 Stop:
 
