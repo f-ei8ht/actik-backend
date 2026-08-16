@@ -3,6 +3,10 @@ import { z } from 'zod'
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FRONTEND_ORIGIN: z.string().default(''),
+  TRUST_PROXY: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   HYDRADB_HTTP_URL: z.preprocess(
     (value) =>
       value === '' || value === undefined ? 'http://127.0.0.1:8443' : value,

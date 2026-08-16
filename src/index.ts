@@ -30,10 +30,11 @@ app.use(
   })
 )
 app.use('/api/*', rateLimit(120, 60_000))
+app.use('/api/scan', rateLimit(20, 60_000))
+app.use('/api/watch/run', rateLimit(10, 60_000))
 
 app.get('/', (c) => c.text('actik API'))
 app.route('/health', health)
-
 app.route('/api/packages', packages)
 app.route('/api/packages', blastRadius)
 app.route('/api/advisories', advisories)
