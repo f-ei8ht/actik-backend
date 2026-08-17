@@ -110,4 +110,10 @@ services:
     volumes:
       - ./proxy/www:/var/www/certbot
       - ./proxy/certs:/etc/letsencrypt
-    command: certonly --webroot -w /var/www/certbot -d api.actik.xyz --email ${CERTBOT_EMAIL:-saif7862254j@gmail.com} --agree-tos --no-eff-email --keep-until-expiring -n
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      [ -L /etc/letsencrypt/live/api.actik.xyz/fullchain.pem ] ||
+      rm -rf /etc/letsencrypt/live/api.actik.xyz;
+      exec certbot certonly --webroot -w /var/www/certbot -d api.actik.xyz
+      --email ${CERTBOT_EMAIL:-saif7862254j@gmail.com} --agree-tos --no-eff-email
+      --keep-until-expiring -n
