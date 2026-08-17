@@ -70,18 +70,26 @@ services:
       - -c
       - >
         set -e;
-        CERT=/etc/nginx/certs/live/api.actik.xyz/fullchain.pem;
-        KEY=/etc/nginx/certs/live/api.actik.xyz/privkey.pem;
-        mkdir -p /etc/nginx/certs/live/api.actik.xyz;
+        CERT=/etc/nginx/certs/fullchain.pem;
+        KEY=/etc/nginx/certs/privkey.pem;
+        REAL=/etc/nginx/certs/live/api.actik.xyz/fullchain.pem;
+        REAL_KEY=/etc/nginx/certs/live/api.actik.xyz/privkey.pem;
+        mkdir -p /etc/nginx/certs;
         if [ ! -f "$$CERT" ]; then
           openssl req -x509 -nodes -newkey rsa:2048 -days 1 -keyout "$$KEY" -out "$$CERT" -subj /CN=api.actik.xyz;
+        fi;
+        if [ -f "$$REAL" ]; then
+          cp -L "$$REAL" "$$CERT";
+          cp -L "$$REAL_KEY" "$$KEY";
         fi;
         nginx -g 'daemon off;' &
         NGINX_PID=$$!;
         LAST=;
         while kill -0 "$$NGINX_PID" 2>/dev/null; do
-          CUR=$$(sha1sum "$$CERT" 2>/dev/null | cut -d' ' -f1);
+          CUR=$$(sha1sum "$$REAL" 2>/dev/null | cut -d' ' -f1);
           if [ -n "$$CUR" ] && [ "$$CUR" != "$$LAST" ]; then
+            cp -L "$$REAL" "$$CERT";
+            cp -L "$$REAL_KEY" "$$KEY";
             nginx -s reload 2>/dev/null || true;
             LAST="$$CUR";
           fi;
@@ -110,10 +118,4 @@ services:
     volumes:
       - ./proxy/www:/var/www/certbot
       - ./proxy/certs:/etc/letsencrypt
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      [ -L /etc/letsencrypt/live/api.actik.xyz/fullchain.pem ] ||
-      rm -rf /etc/letsencrypt/live/api.actik.xyz;
-      exec certbot certonly --webroot -w /var/www/certbot -d api.actik.xyz
-      --email ${CERTBOT_EMAIL:-saif7862254j@gmail.com} --agree-tos --no-eff-email
-      --keep-until-expiring -n
+    command: certonly --webroot -w /var/www/certbot -d api.actik.xyz --email ${CERTBOT_EMAIL:-saif7862254j@gmail.com} --agree-tos --no-eff-email --keep-until-expiring -n
