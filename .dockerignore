@@ -9,3 +9,5 @@ compose*.yml
 *.md
 hydradb-data
 tests
+proxy/certs
+proxy/www
