@@ -109,7 +109,7 @@ MATCH (a:Advisory)
 WHERE a.advisory_id = $id
 RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary,
   a.published_at AS publishedAt, a.modified_at AS modifiedAt, a.references AS references,
-  a.fixed_versions AS fixedVersions
+  a.fixed_versions AS fixedVersions, a.introduced_versions AS introducedVersions
 `
 
 export const advisoryAffectedVersionsQuery = `
@@ -123,7 +123,8 @@ export const advisoriesForVersionQuery = (ecosystem?: string) => `
 MATCH (v:PackageVersion)-[:AFFECTED_BY]->(a:Advisory)
 WHERE v.name = $name AND v.version = $version${withEcosystem('v', ecosystem)}
 RETURN a.advisory_id AS id, a.severity AS severity, a.summary AS summary,
-  a.published_at AS publishedAt, a.modified_at AS modifiedAt, a.fixed_versions AS fixedVersions
+  a.published_at AS publishedAt, a.modified_at AS modifiedAt, a.fixed_versions AS fixedVersions,
+  a.introduced_versions AS introducedVersions
 ORDER BY a.severity
 `
 
@@ -165,7 +166,8 @@ SET v:Advisory,
   v.published_at = n.publishedAt,
   v.modified_at = n.modifiedAt,
   v.references = n.references,
-  v.fixed_versions = n.fixedVersions
+  v.fixed_versions = n.fixedVersions,
+  v.introduced_versions = n.introducedVersions
 `
 
 export const upsertOrganizationNodesQuery = `

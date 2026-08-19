@@ -30,6 +30,8 @@ export interface AdvisoryNode {
   references: string
   /** JSON-encoded map of package name -> first known fixed version */
   fixedVersions: string
+  /** JSON-encoded map of package name -> first version known to be vulnerable */
+  introducedVersions: string
 }
 
 export interface OrganizationNode {

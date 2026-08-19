@@ -1,7 +1,7 @@
 import { env } from '../../lib/config'
 import { advisoryNodeId } from '../types'
 import type { AdvisoryNode } from '../types'
-import { testNpmRange } from '../version'
+import { introducedFromNpmRange, testNpmRange } from '../version'
 import type { AdvisoryPackage, AdvisoryRecord } from './types'
 
 interface NpmAuditAdvisory {
@@ -52,6 +52,10 @@ export async function fetchNpmAuditAdvisories(packages: AdvisoryPackage[]): Prom
         modifiedAt: '',
         references: advisory.url ?? '',
         fixedVersions: '',
+        introducedVersions: (() => {
+          const introduced = introducedFromNpmRange(advisory.vulnerable_versions)
+          return introduced ? JSON.stringify({ [name]: introduced }) : ''
+        })(),
       }
       const versions = packageVersions.filter((version) =>
         testNpmRange(advisory.vulnerable_versions, version)

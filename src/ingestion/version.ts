@@ -94,6 +94,53 @@ export function firstFixedVersion(affected: OsvAffected): string | null {
   )
 }
 
+/**
+ * First known vulnerable version for an OSV affected entry, if the ranges
+ * carry an `introduced` event. Mirrors `firstFixedVersion` and answers
+ * "which version introduced the vulnerability?" (e.g. `4.0.0`).
+ */
+export function firstIntroducedVersion(affected: OsvAffected): string | null {
+  const candidates: string[] = []
+  for (const range of affected.ranges ?? []) {
+    for (const event of range.events ?? []) {
+      if (event.introduced && event.introduced !== '0') candidates.push(event.introduced)
+    }
+  }
+  if (candidates.length === 0) return null
+  return candidates.reduce((best, candidate) =>
+    compareVersions(candidate, best) < 0 ? candidate : best
+  )
+}
+
+/**
+ * First known vulnerable version from an npm audit `vulnerable_versions`
+ * range string (e.g. `>= 4.0.0 < 4.17.21`). Returns the highest lower bound
+ * across `>=` / `>` / `=` comparators and hyphen ranges, or null when the
+ * range has no explicit lower bound.
+ */
+export function introducedFromNpmRange(range: string | null | undefined): string | null {
+  if (!range) return null
+  const lowerBounds: string[] = []
+  for (const group of range.split('||')) {
+    const trimmed = group.trim()
+    if (!trimmed || trimmed === '*') continue
+    const hyphen = trimmed.match(/(\d[\w.+~-]*)\s+-\s+(\d[\w.+~-]*)/)
+    if (hyphen) {
+      lowerBounds.push(hyphen[1])
+      continue
+    }
+    const comparatorRe = /(?:>=|>|=)\s*([\w.+~-]+)/g
+    let match: RegExpExecArray | null
+    while ((match = comparatorRe.exec(trimmed)) !== null) {
+      lowerBounds.push(match[1])
+    }
+  }
+  if (lowerBounds.length === 0) return null
+  return lowerBounds.reduce((best, candidate) =>
+    compareVersions(candidate, best) > 0 ? candidate : best
+  )
+}
+
 export function testOsvAffected(affected: OsvAffected, version: string): boolean {
   if (Array.isArray(affected.versions) && affected.versions.includes(version)) return true
   if (!Array.isArray(affected.ranges)) return false

@@ -86,6 +86,14 @@ describe('normalizeAdvisory', () => {
       {
         package: { ecosystem: 'npm', name: 'lodash' },
         versions: ['4.17.20'],
+        ranges: [
+          {
+            events: [
+              { introduced: '4.0.0' },
+              { fixed: '4.17.21' },
+            ],
+          },
+        ],
       },
     ],
   }
@@ -98,6 +106,12 @@ describe('normalizeAdvisory', () => {
     expect(node.references).toBe('https://example.com/advisory')
     expect(node.publishedAt).toBe('2021-01-26T00:00:00Z')
     expect(node.modifiedAt).toBe('2021-02-01T00:00:00Z')
+  })
+
+  it('records the introduced and fixed versions', () => {
+    const node = normalizeAdvisory(doc)
+    expect(node.fixedVersions).toBe(JSON.stringify({ lodash: '4.17.21' }))
+    expect(node.introducedVersions).toBe(JSON.stringify({ lodash: '4.0.0' }))
   })
 
   it('derives severity from cvss score when database severity is absent', () => {

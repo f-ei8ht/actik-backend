@@ -1,6 +1,6 @@
 import { computeBlastRadius } from '../analysis/blast-radius'
 import { fetchOsvFindings } from '../analysis/osv-findings'
-import { getAdvisoriesForVersion } from './advisory.service'
+import { getAdvisoriesForVersion, type AdvisoryDetails } from './advisory.service'
 import { getMaintainerRisk, getSharedMaintainers } from './maintainer.service'
 import { getTyposquatCandidates } from './typosquat.service'
 import { getVersionDetails, listVersions } from './package.service'
@@ -30,7 +30,7 @@ const EMPTY_RISK = {
   presentInRepositories: 0,
 }
 
-function osvToAdvisory(finding: ScanFinding) {
+function osvToAdvisory(finding: ScanFinding): AdvisoryDetails {
   return {
     id: finding.advisory.id,
     severity: finding.severity,
@@ -41,6 +41,7 @@ function osvToAdvisory(finding: ScanFinding) {
     fixedVersions: finding.fixedVersion
       ? { [finding.package]: finding.fixedVersion }
       : {},
+    introducedVersions: {},
     affectedVersions: [],
   }
 }
@@ -100,11 +101,15 @@ export async function investigate(
   const recommendations: string[] = []
   for (const advisory of advisories) {
     const fix = advisory.fixedVersions[name]
+    const introduced = advisory.introducedVersions[name]
     recommendations.push(
       fix
         ? `Upgrade ${name} ${version} -> ${fix} (${advisory.id})`
         : `Review advisory ${advisory.id}: no known fixed version`
     )
+    if (introduced && compareVersions(version, introduced) >= 0) {
+      recommendations.push(`${name} ${version} has been vulnerable since ${introduced} (${advisory.id})`)
+    }
   }
   if (blastRadius && blastRadius.affectedRepositories.length > 0) {
     recommendations.push(

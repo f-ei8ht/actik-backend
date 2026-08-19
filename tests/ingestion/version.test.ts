@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'bun:test'
-import { compareVersions, parseVersion, testOsvAffected, versionInRangeEvents } from '../../src/ingestion/version'
+import {
+  compareVersions,
+  firstIntroducedVersion,
+  introducedFromNpmRange,
+  parseVersion,
+  testOsvAffected,
+  versionInRangeEvents,
+} from '../../src/ingestion/version'
 
 describe('parseVersion', () => {
   it('splits dotted numeric versions', () => {
@@ -50,6 +57,47 @@ describe('versionInRangeEvents', () => {
     const events = [{ introduced: '9.0.0' }, { last_affected: '9.1.0' }]
     expect(versionInRangeEvents(events, '9.1.0')).toBe(true)
     expect(versionInRangeEvents(events, '9.1.1')).toBe(false)
+  })
+})
+
+describe('firstIntroducedVersion', () => {
+  it('returns the earliest introduced event', () => {
+    const affected = {
+      ranges: [
+        { events: [{ introduced: '4.0.0' }, { fixed: '4.17.21' }] },
+        { events: [{ introduced: '3.2.0' }, { fixed: '3.4.0' }] },
+      ],
+    }
+    expect(firstIntroducedVersion(affected)).toBe('3.2.0')
+  })
+
+  it('ignores unbounded introduced "0"', () => {
+    const affected = { ranges: [{ events: [{ introduced: '0' }, { fixed: '1.26.5' }] }] }
+    expect(firstIntroducedVersion(affected)).toBeNull()
+  })
+
+  it('returns null when no introduced event exists', () => {
+    expect(firstIntroducedVersion({ versions: ['1.0.0'] })).toBeNull()
+  })
+})
+
+describe('introducedFromNpmRange', () => {
+  it('extracts the lower bound from a range', () => {
+    expect(introducedFromNpmRange('>= 4.0.0 < 4.17.21')).toBe('4.0.0')
+  })
+
+  it('picks the highest lower bound across comparators', () => {
+    expect(introducedFromNpmRange('>= 3.0.0 >= 4.0.0 < 5.0.0')).toBe('4.0.0')
+  })
+
+  it('handles hyphen ranges', () => {
+    expect(introducedFromNpmRange('4.0.0 - 4.17.20')).toBe('4.0.0')
+  })
+
+  it('returns null when there is no lower bound', () => {
+    expect(introducedFromNpmRange('< 4.17.21')).toBeNull()
+    expect(introducedFromNpmRange('')).toBeNull()
+    expect(introducedFromNpmRange(undefined)).toBeNull()
   })
 })
 

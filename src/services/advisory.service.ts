@@ -15,10 +15,11 @@ export interface AdvisoryDetails {
   modifiedAt: string
   references: string
   fixedVersions: Record<string, string>
+  introducedVersions: Record<string, string>
   affectedVersions: VersionDetails[]
 }
 
-function decodeFixedVersions(value: unknown): Record<string, string> {
+function decodeJsonMap(value: unknown): Record<string, string> {
   if (typeof value !== 'string' || value === '') return {}
   try {
     return JSON.parse(value) as Record<string, string>
@@ -47,7 +48,8 @@ export async function getAdvisory(id: string): Promise<AdvisoryDetails> {
     publishedAt: String(rows[0].publishedAt ?? ''),
     modifiedAt: String(rows[0].modifiedAt ?? ''),
     references: String(rows[0].references ?? ''),
-    fixedVersions: decodeFixedVersions(rows[0].fixedVersions),
+    fixedVersions: decodeJsonMap(rows[0].fixedVersions),
+    introducedVersions: decodeJsonMap(rows[0].introducedVersions),
     affectedVersions: affectedRows.map((row) => ({
       name: String(row.name),
       version: String(row.version),
@@ -74,7 +76,8 @@ export async function getAdvisoriesForVersion(
     publishedAt: String(row.publishedAt ?? ''),
     modifiedAt: String(row.modifiedAt ?? ''),
     references: '',
-    fixedVersions: decodeFixedVersions(row.fixedVersions),
+    fixedVersions: decodeJsonMap(row.fixedVersions),
+    introducedVersions: decodeJsonMap(row.introducedVersions),
     affectedVersions: [],
   }))
 }
