@@ -362,6 +362,32 @@ bun test
 bunx tsc --noEmit
 ```
 
+## Benchmarks & evaluation
+
+Real numbers, straight from HydraDB — nothing is invented. Requires a running,
+seeded HydraDB (the dev compose brings it up and seeds it automatically).
+
+```sh
+bun run bench        # dataset report + query latency (P50/P95/P99)
+bun run bench:all    # same, plus precision/recall vs OSV ground truth
+bun run bench --iter 100   # raise the iteration count for tighter percentiles
+```
+
+What it measures:
+
+- **Dataset report** — node and edge counts (packages, versions, maintainers,
+  advisories, organizations, repositories, lockfiles; `DEPENDS_ON`,
+  `AFFECTED_BY`, `RESOLVES`, …).
+- **Query latency** — repeats real package, dependents, advisory and full
+  blast-radius queries N times and reports min / P50 / P95 / P99 / max / mean.
+  Blast radius is timed end-to-end across every HydraDB query it issues, not
+  just the `algo.SSPaths` traversal.
+- **Precision / recall** — for the demo-org applications, compares what the
+  graph flags (`RESOLVES` → `AFFECTED_BY`) against ground truth from the live
+  Google OSV API, at the `(app|package|version)` exposure level and the strict
+  advisory-ID level. The exposure level is the fair metric, because the same
+  bug is often `npm-audit-*` in one database and `GHSA-*` in the other.
+
 ## Environment variables
 
 All configuration lives in `.env.example`. Secrets stay in `.env` and are never committed. Key variables:

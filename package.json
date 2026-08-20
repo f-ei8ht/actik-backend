@@ -4,6 +4,8 @@
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
     "ingest": "bun run src/ingestion/runner.ts",
+    "bench": "bun run scripts/bench.ts",
+    "bench:all": "bun run scripts/bench.ts --eval",
     "test": "bun test"
   },
   "dependencies": {
