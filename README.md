@@ -388,6 +388,53 @@ What it measures:
   advisory-ID level. The exposure level is the fair metric, because the same
   bug is often `npm-audit-*` in one database and `GHSA-*` in the other.
 
+### Current results
+
+Recorded against a locally seeded HydraDB via `bun run bench:all --iter 25`
+(N = 25 real queries per case). Re-run any time to regenerate.
+
+**Dataset**
+
+| Metric | Count |
+|---|---|
+| Packages | 56 |
+| Package versions | 80 |
+| Maintainers | 80 |
+| Advisories | 205 |
+| Organizations / repositories / lockfiles | 1 / 8 / 8 |
+| `DEPENDS_ON` edges | 42 |
+| `AFFECTED_BY` edges | 223 |
+| `RESOLVES` edges | 50 |
+
+**Query latency (ms)** — package lookup, dependents and advisory queries are
+single HydraDB round-trips; blast radius is the full end-to-end cost.
+
+| Query | P50 | P95 | P99 |
+|---|---|---|---|
+| package lodash@4.17.20 | 4.4 | 5.1 | 6.2 |
+| dependents lodash@4.17.20 | 4.5 | 5.7 | 5.9 |
+| advisories lodash@4.17.20 | 21.3 | 23.2 | 24.1 |
+| blast-radius lodash@4.17.20 (full) | 9.7 | 11.3 | 11.5 |
+| blast-radius express@4.18.2 (full) | 4.2 | 5.0 | 5.2 |
+| blast-radius request@2.88.2 (full) | 8.9 | 10.1 | 10.4 |
+| blast-radius aiohttp@3.8.4 (full) | 3.7 | 5.1 | 5.5 |
+
+**Precision / recall vs OSV ground truth** (demo-org applications, exposure
+level `app|package|version`)
+
+| Metric | Value |
+|---|---|
+| Ground-truth exposed app-versions | 5 |
+| Predicted exposed app-versions | 5 |
+| True positives | 4 |
+| Precision | 0.800 |
+| Recall | 0.800 |
+| F1 | 0.800 |
+
+The single exposure discrepancy (`storefront|qs|6.5.2` flagged by the graph
+but not OSV; `storefront|axios|1.14.1` flagged by OSV but not the graph) is a
+real npm-audit vs OSV advisory-coverage difference, not a traversal error.
+
 ## Environment variables
 
 All configuration lives in `.env.example`. Secrets stay in `.env` and are never committed. Key variables:
