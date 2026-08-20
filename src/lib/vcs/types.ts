@@ -1,4 +1,4 @@
-export type RepoHost = 'github' | 'gitlab' | 'bitbucket' | 'codeberg'
+export type RepoHost = 'github' | 'gitlab'
 
 export interface RepoRef {
   host: RepoHost

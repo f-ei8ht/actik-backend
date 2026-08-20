@@ -19,22 +19,17 @@ describe('parseRepo', () => {
     })
   })
 
-  it('detects GitLab, Bitbucket and Codeberg URLs', () => {
+  it('detects GitLab URLs', () => {
     expect(parseRepo('https://gitlab.com/group/project')).toEqual({
       host: 'gitlab',
       owner: 'group',
       name: 'project',
     })
-    expect(parseRepo('https://bitbucket.org/team/repo')).toEqual({
-      host: 'bitbucket',
-      owner: 'team',
-      name: 'repo',
-    })
-    expect(parseRepo('https://codeberg.org/user/repo.git')).toEqual({
-      host: 'codeberg',
-      owner: 'user',
-      name: 'repo',
-    })
+  })
+
+  it('rejects Bitbucket and Codeberg URLs', () => {
+    expect(() => parseRepo('https://bitbucket.org/team/repo')).toThrow(/unsupported host/)
+    expect(() => parseRepo('https://codeberg.org/user/repo.git')).toThrow(/unsupported host/)
   })
 
   it('rejects unknown hosts and malformed refs', () => {

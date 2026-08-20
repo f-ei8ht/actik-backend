@@ -1,6 +1,4 @@
 import { AppError } from '../errors'
-import * as bitbucket from './bitbucket'
-import * as codeberg from './codeberg'
 import * as github from './github'
 import * as gitlab from './gitlab'
 import { parseRepo, repoLabel } from './repo'
@@ -24,7 +22,7 @@ export const MANIFEST_CANDIDATES = [
   'Pipfile.lock',
 ]
 
-const HOSTS = { github, gitlab, bitbucket, codeberg } as const
+const HOSTS = { github, gitlab } as const
 
 function hostModule(repo: RepoRef) {
   return HOSTS[repo.host]

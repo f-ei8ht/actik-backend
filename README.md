@@ -13,6 +13,21 @@ actik is a graph-native software supply-chain intelligence platform. It models p
 
 Built for the [Hack Hydra](https://hackhydra.hydradb.com) Track 02A brief (Repos, Dependencies + Code as Graphs) around the [HydraDB open-source repo](https://github.com/hydra-db/hydradb).
 
+## The problem
+
+Supply-chain attacks via npm and PyPI are surging, and current developer tools fail to give real-time, deep context on malicious dependencies. This is fundamentally a graph traversal problem, not a semantic similarity problem. When a package is compromised, a defender needs the answer to a set of relationship questions in seconds:
+
+- Which internal services are transitively exposed?
+- Which version introduced the vulnerability, and which version fixes it?
+- Which apps resolved the bad version while it was live?
+- Which packages share maintainers or infrastructure?
+- Are there likely typosquat packages nearby?
+- What is the complete blast radius?
+
+The TanStack compromise illustrates the stakes: 84 malicious artifacts across 42 packages in six minutes, self-propagating into `.claude/` and `.vscode/` in a way that survived `npm uninstall`. The defender's problem is speed — when a package is compromised at 09:00, which services are exposed by 09:06? That is a transitive reverse-dependency closure over a versioned ecosystem graph. A vector index cannot answer it at all, and a relational store answers it with awkward recursive CTEs. A graph database answers it natively.
+
+actik models the whole supply chain as a graph in HydraDB and answers every one of those questions by traversal.
+
 ## Highlights
 
 - Hono + TypeScript backend running on Bun
@@ -49,7 +64,7 @@ flowchart TB
     end
 
     subgraph scan_targets["Scan targets (on demand)"]
-        gh["GitHub / GitLab / Bitbucket / Codeberg"]
+        gh["GitHub / GitLab"]
     end
 
     Web -- HTTPS --> nginx
@@ -139,7 +154,7 @@ flowchart LR
 
 ### Repository scanner
 
-`POST /api/scan` accepts a repository URL or `owner/name` and pulls `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`, `uv.lock` or `requirements*.txt` straight from the repo with no clone and no token across GitHub, GitLab, Bitbucket and Codeberg. It returns:
+`POST /api/scan` accepts a repository URL or `owner/name` and pulls `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`, `uv.lock` or `requirements*.txt` straight from the repo with no clone and no token on GitHub or GitLab. It returns:
 
 - an exposure score (0 to 100) weighted by severity times count
 - every vulnerable package with its advisory and the exact fix command
@@ -280,7 +295,7 @@ All `:name` / `:name/:version` routes accept an optional `?ecosystem=npm|PyPI` q
 | `GET /api/advisories/:id` | Advisory details + affected versions + known introduced and fixed versions |
 | `GET /api/advisories/:id/exposure-window` | Apps that resolved an affected version while the advisory was live with a per-app `EXPOSED` / `AT_RISK` conclusion; optional `?asOf=YYYY-MM-DD` snapshot |
 | `GET /api/graph/:name/:version` | Alias for the package graph endpoint |
-| `POST /api/scan` | Scan a repository (`{"repo":"owner/name"}` or a full GitHub/GitLab/Bitbucket/Codeberg URL): fetch manifests, resolve exact versions, write into the graph, return exposure score + findings + fixes + minimal-fix set |
+| `POST /api/scan` | Scan a repository (`{"repo":"owner/name"}` or a full GitHub/GitLab URL): fetch manifests, resolve exact versions, write into the graph, return exposure score + findings + fixes + minimal-fix set |
 | `GET /api/scan/:owner/:name` | Re-run analysis for a previously scanned repo from the graph (no re-fetch) |
 | `GET /api/simulate/propagation/:name/:version` | Worm simulation: compromise a package at `?compromisedAt=`, compute each app time-to-exposure from DEPENDS_ON depth (`?perHopMs=`, default 6 min) |
 | `GET /api/investigate/:ecosystem/:name/:version` | One-call investigation: version details + advisories + blast radius + maintainer risk + typosquats + recommendations |
@@ -434,6 +449,39 @@ level `app|package|version`)
 The single exposure discrepancy (`storefront|qs|6.5.2` flagged by the graph
 but not OSV; `storefront|axios|1.14.1` flagged by OSV but not the graph) is a
 real npm-audit vs OSV advisory-coverage difference, not a traversal error.
+
+### How this maps to the Track 02A evaluation
+
+The brief scores submissions on **precision, recall, query latency and cost**,
+with ground truth free from OSV / the GitHub Advisory Database:
+
+- **Precision / recall** — measured directly against live Google OSV as ground
+  truth (`bench:all`). Reported at both the exposure level and the strict
+  advisory-ID level in the table above.
+- **Query latency** — the P50/P95/P99 table above measures real end-to-end
+  HydraDB round-trips; blast radius is the full traversal cost, not just the
+  `algo.SSPaths` call.
+- **Cost** — blast radius and dependents are single cheap traversals
+  (single-digit ms on the seeded graph), and ingestion runs once at startup,
+  not on the request path.
+
+## Demo video
+
+The 3-minute submission video walks through, in order:
+
+1. **The problem** — when a package is compromised at 09:00, which of your
+   services are exposed by 09:06? Why that is a graph-traversal question.
+2. **The project** — actik models packages, versions, dependencies, advisories,
+   maintainers and the internal apps that consume them as one graph in
+   HydraDB.
+3. **The demo** — scan a real repository, view the exposure score and minimal
+   fix set, open an investigation page, traverse the interactive dependency
+   graph, replay a time-travel exposure window, and run a worm-propagation
+   simulation.
+4. **HydraDB** — every feature is a graph traversal (`algo.SSPaths` blast
+   radius, `AFFECTED_BY` joins, temporal `RESOLVES` edges, reverse
+   `DEPENDS_ON` closure). Without the graph there is no transitive exposure
+   answer.
 
 ## Environment variables
 

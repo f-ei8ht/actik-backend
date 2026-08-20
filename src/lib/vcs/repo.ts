@@ -6,13 +6,9 @@ const HOST_ALIASES: Record<string, RepoHost> = {
   'www.github.com': 'github',
   'gitlab.com': 'gitlab',
   'www.gitlab.com': 'gitlab',
-  'bitbucket.org': 'bitbucket',
-  'www.bitbucket.org': 'bitbucket',
-  'codeberg.org': 'codeberg',
-  'www.codeberg.org': 'codeberg',
 }
 
-const SUPPORTED_HOSTS: RepoHost[] = ['github', 'gitlab', 'bitbucket', 'codeberg']
+const SUPPORTED_HOSTS: RepoHost[] = ['github', 'gitlab']
 
 export function parseRepo(repo: string): RepoRef {
   const clean = repo.trim().replace(/\.git$/, '')
@@ -36,7 +32,7 @@ export function parseRepo(repo: string): RepoRef {
     throw new AppError(
       400,
       'invalid_repo',
-      'expected "owner/repo" or a GitHub, GitLab, Bitbucket, or Codeberg repository URL'
+      'expected "owner/repo" or a GitHub or GitLab repository URL'
     )
   }
   if (!SUPPORTED_HOSTS.includes(host)) {
